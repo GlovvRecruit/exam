@@ -221,7 +221,7 @@
 <script src="exam-data-meta-ads.js"></script>
 <script>
 // ============== Supabase 클라이언트 ==============
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // ============== 전역 상태 ==============
 let currentAttemptId = null;
@@ -263,7 +263,7 @@ document.getElementById("btn-start").addEventListener("click", async () => {
   try {
     // Supabase에 응시 기록 생성
     const today = new Date().toISOString().split("T")[0];
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from("exam_attempts")
       .insert({ name, exam_date: today, exam_type: "meta-ads" })
       .select()
@@ -420,7 +420,7 @@ function saveDraft() {
   if (!currentAttemptId) return;
   clearTimeout(saveTimer);
   saveTimer = setTimeout(async () => {
-    await supabase.from("exam_attempts").update({
+    await db.from("exam_attempts").update({
       mcq_answers: answers.mcq,
       short_answers: answers.short,
       essay_answers: answers.essay,
@@ -470,7 +470,7 @@ async function submitExam() {
   const grading = autoGrade(answers.mcq, answers.short);
 
   // Supabase 업데이트
-  const { error } = await supabase.from("exam_attempts").update({
+  const { error } = await db.from("exam_attempts").update({
     mcq_answers: answers.mcq,
     short_answers: answers.short,
     essay_answers: answers.essay,

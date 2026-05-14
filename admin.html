@@ -230,7 +230,7 @@
 <!-- 메타광고 데이터만 여기서 로드. 나머지 시험은 채점할 때 동적 로드 -->
 <script src="exam-data-meta-ads.js"></script>
 <script>
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // ============== 시험 종류 메타데이터 ==============
 const EXAM_TYPES = {
@@ -306,7 +306,7 @@ document.querySelectorAll(".filter-btn").forEach(btn => {
 
 // ============== 응시자 목록 ==============
 async function loadList() {
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from("exam_attempts")
     .select("*")
     .order("started_at", { ascending: false });
@@ -632,7 +632,7 @@ async function saveMetaAdsGrading(attemptId, autoScore) {
   const btn = document.getElementById("btn-save");
   btn.disabled = true;
   btn.textContent = "저장 중...";
-  const { error } = await supabase.from("exam_attempts").update({
+  const { error } = await db.from("exam_attempts").update({
     essay_score: essayTotal,
     essay_grading: essayGrading,
     essay_status: "graded",
@@ -775,7 +775,7 @@ async function saveMemoGrading(attemptId, autoScore) {
   const btn = document.getElementById("btn-save");
   btn.disabled = true;
   btn.textContent = "저장 중...";
-  const { error } = await supabase.from("exam_attempts").update({
+  const { error } = await db.from("exam_attempts").update({
     essay_score: v,
     essay_status: "graded",
     storyline_score: 0,

@@ -204,7 +204,7 @@ const ESSAY_QUESTIONS = _data.ESSAY_QUESTIONS;
 const autoGradeMemorization = _data.autoGradeMemorization;
 
 // ============== Supabase 클라이언트 ==============
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // ============== 전역 상태 ==============
 let currentAttemptId = null;
@@ -242,7 +242,7 @@ document.getElementById("btn-start").addEventListener("click", async () => {
 
   try {
     const today = new Date().toISOString().split("T")[0];
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from("exam_attempts")
       .insert({ name, exam_date: today, exam_type: EXAM_TYPE })
       .select()
@@ -333,7 +333,7 @@ function saveDraft() {
   if (!currentAttemptId) return;
   clearTimeout(saveTimer);
   saveTimer = setTimeout(async () => {
-    await supabase.from("exam_attempts").update({
+    await db.from("exam_attempts").update({
       essay_answers: answers,
     }).eq("id", currentAttemptId);
   }, 1500);
@@ -379,7 +379,7 @@ async function submitExam() {
   // 자동 채점
   const grading = autoGradeMemorization(answers);
 
-  const { error } = await supabase.from("exam_attempts").update({
+  const { error } = await db.from("exam_attempts").update({
     essay_answers: answers,
     submitted_at: new Date().toISOString(),
     auto_score: grading.score,
