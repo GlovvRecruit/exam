@@ -140,7 +140,7 @@
       <div class="meta" style="justify-content: center;">
         <span>총 <b>26문항</b></span>
         <span>만점 <b>100점</b></span>
-        <span>권장 <b id="exam-duration-display">60분</b></span>
+        <span>권장 <b id="exam-duration-display">30분</b></span>
       </div>
       <p style="color: #6b7180; font-size: 14px; margin: 20px 0;">
         시험을 시작하려면 이름을 입력하세요.<br>
@@ -220,6 +220,9 @@
 <script src="config.js"></script>
 <script src="exam-data-meta-ads.js"></script>
 <script>
+// ============== 이 시험만의 제한 시간 (분) ==============
+const EXAM_DURATION = 30;
+
 // ============== Supabase 클라이언트 ==============
 const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
@@ -238,8 +241,8 @@ let timerInterval = null;
 // ============== 초기 화면 세팅 ==============
 document.getElementById("exam-title").textContent = EXAM_TITLE;
 document.getElementById("exam-subtitle").textContent = EXAM_SUBTITLE;
-if (EXAM_DURATION_MIN > 0) {
-  document.getElementById("exam-duration-display").textContent = EXAM_DURATION_MIN + "분";
+if (EXAM_DURATION > 0) {
+  document.getElementById("exam-duration-display").textContent = EXAM_DURATION + "분";
 } else {
   document.getElementById("exam-duration-display").textContent = "제한 없음";
 }
@@ -431,11 +434,11 @@ function saveDraft() {
 
 // ============== 타이머 ==============
 function startTimer() {
-  if (EXAM_DURATION_MIN <= 0) {
+  if (EXAM_DURATION <= 0) {
     document.getElementById("timer-display").textContent = "";
     return;
   }
-  examEndTime = Date.now() + EXAM_DURATION_MIN * 60 * 1000;
+  examEndTime = Date.now() + EXAM_DURATION * 60 * 1000;
   timerInterval = setInterval(() => {
     const remain = examEndTime - Date.now();
     if (remain <= 0) {

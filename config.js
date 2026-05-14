@@ -13,4 +13,4 @@ const SUPABASE_ANON_KEY = "sb_publishable_PdycpPV2Se5PIR3TXULIGA_3IyPVFRS";
 const ADMIN_PASSWORD = "glovv2026";
 
 // 시험 시간 (분). 0이면 시간 제한 없음.
-const EXAM_DURATION_MIN = 60;
+const EXAM_DURATION_MIN = 30;

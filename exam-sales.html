@@ -197,6 +197,7 @@
 <script>
 // ============== 시험 종류 ==============
 const EXAM_TYPE = "sales";
+const EXAM_DURATION = 60;  // 이 시험만의 제한 시간 (분)
 const _data = window.examDataSales;
 const EXAM_TITLE = _data.EXAM_TITLE;
 const EXAM_SUBTITLE = _data.EXAM_SUBTITLE;
@@ -218,8 +219,8 @@ document.getElementById("exam-title").textContent = EXAM_TITLE;
 document.getElementById("exam-subtitle").textContent = EXAM_SUBTITLE;
 document.getElementById("total-q").textContent = ESSAY_QUESTIONS.length;
 document.getElementById("exam-name-display").textContent = EXAM_TITLE;
-if (EXAM_DURATION_MIN > 0) {
-  document.getElementById("exam-duration-display").textContent = EXAM_DURATION_MIN + "분";
+if (EXAM_DURATION > 0) {
+  document.getElementById("exam-duration-display").textContent = EXAM_DURATION + "분";
 } else {
   document.getElementById("exam-duration-display").textContent = "제한 없음";
 }
@@ -341,11 +342,11 @@ function saveDraft() {
 
 // ============== 타이머 ==============
 function startTimer() {
-  if (EXAM_DURATION_MIN <= 0) {
+  if (EXAM_DURATION <= 0) {
     document.getElementById("timer-display").textContent = "";
     return;
   }
-  examEndTime = Date.now() + EXAM_DURATION_MIN * 60 * 1000;
+  examEndTime = Date.now() + EXAM_DURATION * 60 * 1000;
   timerInterval = setInterval(() => {
     const remain = examEndTime - Date.now();
     if (remain <= 0) {
