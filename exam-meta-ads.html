@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>메타 광고 노하우 - 평가</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "맑은 고딕", "Malgun Gothic", system-ui, sans-serif;
+    background: #f6f7fb;
+    color: #1f2330;
+    margin: 0;
+    padding: 24px 12px;
+    line-height: 1.65;
+  }
+  .container {
+    max-width: 760px;
+    margin: 0 auto;
+    background: #fff;
+    border-radius: 16px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.06);
+    padding: 32px 28px;
+  }
+  h1 { margin: 0 0 8px; font-size: 26px; letter-spacing: -0.5px; }
+  .subtitle { color: #6b7180; margin-bottom: 24px; font-size: 14px; }
+  .meta {
+    display: flex; gap: 16px; flex-wrap: wrap;
+    background: #f0f3fa; padding: 12px 16px; border-radius: 10px;
+    font-size: 13px; color: #4a5160; margin-bottom: 28px;
+  }
+  .meta b { color: #1f2330; }
+  /* 입력 화면 */
+  .start-card { text-align: center; padding: 40px 20px; }
+  .start-card input {
+    font-size: 18px; padding: 14px 16px; width: 100%; max-width: 360px;
+    border: 1px solid #d6dae3; border-radius: 10px; margin: 16px 0; text-align: center;
+  }
+  .btn {
+    background: #2e75b6; color: #fff; border: 0; padding: 14px 28px;
+    border-radius: 10px; font-size: 16px; font-weight: 700; cursor: pointer;
+    transition: background .15s;
+  }
+  .btn:hover { background: #225d96; }
+  .btn:disabled { background: #aab2c0; cursor: not-allowed; }
+  .btn.secondary { background: #6b7180; }
+  /* 문제 */
+  .section-title {
+    font-size: 18px; font-weight: 800; margin: 32px 0 8px;
+    padding-bottom: 8px; border-bottom: 2px solid #2e75b6;
+  }
+  .q {
+    margin: 24px 0; padding: 20px; background: #fafbff; border-radius: 12px;
+    border: 1px solid #ebeef5;
+  }
+  .q-num { color: #2e75b6; font-weight: 800; margin-right: 6px; }
+  .q-text { font-weight: 600; font-size: 15.5px; }
+  .q-points { color: #8b919f; font-size: 13px; margin-left: 8px; }
+  .choices { margin-top: 14px; }
+  .choices label {
+    display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px;
+    border-radius: 8px; cursor: pointer; transition: background .12s;
+    border: 1px solid transparent;
+  }
+  .choices label:hover { background: #eef3fb; }
+  .choices input[type="radio"] { margin-top: 4px; flex-shrink: 0; }
+  .choices label.selected { background: #e0ecf9; border-color: #2e75b6; }
+  .short-input, .essay-input {
+    width: 100%; border: 1px solid #d6dae3; border-radius: 8px;
+    padding: 10px 12px; font-family: inherit; font-size: 15px; margin-top: 10px;
+  }
+  .short-input { min-height: 56px; }
+  .essay-input { min-height: 180px; resize: vertical; }
+  .scenario {
+    background: #eff5fb; border-left: 3px solid #2e75b6;
+    padding: 14px 16px; margin: 12px 0; border-radius: 8px;
+    font-size: 14px; white-space: pre-wrap;
+  }
+  /* 진행 표시 */
+  .progress-bar {
+    position: sticky; top: 0; background: #fff; padding: 12px 0;
+    margin: -32px -28px 20px; padding: 14px 28px;
+    border-bottom: 1px solid #ebeef5; z-index: 10;
+    font-size: 13px; color: #6b7180;
+  }
+  .progress-bar .bar {
+    height: 6px; background: #ebeef5; border-radius: 3px; overflow: hidden; margin-top: 6px;
+  }
+  .progress-bar .fill {
+    height: 100%; background: #2e75b6; width: 0%; transition: width .2s;
+  }
+  /* 제출 영역 */
+  .submit-area {
+    margin: 40px 0 0; padding: 24px; background: #f0f3fa;
+    border-radius: 12px; text-align: center;
+  }
+  .submit-area p { margin: 0 0 14px; color: #4a5160; font-size: 14px; }
+  /* 결과 */
+  .result-card { padding: 30px 20px; text-align: center; }
+  .result-score {
+    font-size: 54px; font-weight: 900; color: #2e75b6; margin: 16px 0 4px;
+  }
+  .result-detail {
+    background: #fafbff; padding: 18px; border-radius: 10px;
+    margin: 18px 0; text-align: left; font-size: 14px;
+  }
+  .result-detail h3 { margin: 0 0 8px; font-size: 15px; }
+  .result-detail ul { margin: 0; padding-left: 18px; }
+  .alert {
+    background: #fff4e6; border: 1px solid #f6c688; padding: 12px 16px;
+    border-radius: 8px; margin: 12px 0; font-size: 13.5px; color: #8b5a00;
+  }
+  .alert.error {
+    background: #ffe9e9; border-color: #f6a3a3; color: #a13030;
+  }
+  .timer {
+    font-weight: 700; color: #2e75b6;
+  }
+  .timer.warning { color: #c95400; }
+  .timer.danger { color: #c00; }
+  @media (max-width: 600px) {
+    body { padding: 12px 6px; }
+    .container { padding: 20px 16px; }
+    h1 { font-size: 22px; }
+    .progress-bar { margin: -20px -16px 16px; padding: 12px 16px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+
+  <!-- 시작 화면 -->
+  <div id="screen-start">
+    <a href="index.html" class="back-link" style="display:inline-block; color:#6b7180; font-size:13px; text-decoration:none; margin-bottom:14px;">← 시험 선택으로</a>
+    <div class="start-card">
+      <h1 id="exam-title">메타 광고 노하우 - 종합 평가</h1>
+      <div class="subtitle" id="exam-subtitle">메타 광고 노하우 5권 + 글로브 웨비나</div>
+      <div class="meta" style="justify-content: center;">
+        <span>총 <b>26문항</b></span>
+        <span>만점 <b>100점</b></span>
+        <span>권장 <b id="exam-duration-display">60분</b></span>
+      </div>
+      <p style="color: #6b7180; font-size: 14px; margin: 20px 0;">
+        시험을 시작하려면 이름을 입력하세요.<br>
+        같은 날 같은 이름으로는 한 번만 응시할 수 있습니다.
+      </p>
+      <input type="text" id="input-name" placeholder="이름" maxlength="20" autocomplete="off">
+      <br>
+      <button class="btn" id="btn-start">시험 시작</button>
+      <div id="start-error" class="alert error" style="display:none; margin-top: 20px;"></div>
+    </div>
+  </div>
+
+  <!-- 시험 화면 -->
+  <div id="screen-exam" style="display:none;">
+    <div class="progress-bar">
+      <div style="display: flex; justify-content: space-between;">
+        <span><b id="user-name-display"></b>님 응시 중</span>
+        <span class="timer" id="timer-display"></span>
+      </div>
+      <div style="display: flex; justify-content: space-between; margin-top: 4px;">
+        <span id="progress-text">0 / 26 문항 작성</span>
+      </div>
+      <div class="bar"><div class="fill" id="progress-fill"></div></div>
+    </div>
+
+    <div class="section-title">PART 1. 객관식 (각 2점, 총 20점)</div>
+    <div id="mcq-container"></div>
+
+    <div class="section-title">PART 2. 단답형 (각 2점, 총 20점)</div>
+    <p style="font-size: 13px; color: #6b7180; margin: 8px 0 0;">※ 단어·숫자·계산식 중 요구하는 형태로 답하세요.</p>
+    <div id="short-container"></div>
+
+    <div class="section-title">PART 3. 심화 케이스 — 서술형 (각 6점, 총 30점)</div>
+    <p style="font-size: 13px; color: #6b7180; margin: 8px 0 0;">※ 자료의 지표·원칙·수치를 근거로 인용해야 만점입니다.</p>
+    <div id="essay-container"></div>
+
+    <div class="section-title">PART 4. 광고 스토리라인 작성 (30점, 실전 과제)</div>
+    <p style="font-size: 13px; color: #6b7180; margin: 8px 0 14px;">※ 백지 상태에서 스스로 자료의 표준을 적용해 작성하세요. 가이드라인은 제공되지 않습니다.</p>
+    <div id="storyline-container"></div>
+
+    <div class="submit-area">
+      <p>제출 후에는 답안을 수정할 수 없습니다.</p>
+      <button class="btn" id="btn-submit">최종 제출</button>
+    </div>
+  </div>
+
+  <!-- 결과 화면 -->
+  <div id="screen-result" style="display:none;">
+    <div class="result-card">
+      <h1>제출 완료</h1>
+      <div class="subtitle"><span id="result-name"></span>님, 수고하셨습니다.</div>
+
+      <div class="alert" id="result-pending">
+        객관식·단답형은 자동 채점되었습니다. 서술형·스토리라인은 출제자 채점 후 최종 점수가 결정됩니다.
+      </div>
+
+      <div class="result-detail">
+        <h3>자동 채점 결과</h3>
+        <ul>
+          <li>객관식: <b id="result-mcq">0</b> / 20점</li>
+          <li>단답형: <b id="result-short">0</b> / 20점</li>
+          <li>서술형: 채점 대기 (30점 만점)</li>
+          <li>스토리라인: 채점 대기 (30점 만점)</li>
+        </ul>
+        <div style="margin-top: 14px; padding-top: 14px; border-top: 1px solid #e3e7ef;">
+          현재 점수: <span class="result-score" style="font-size: 32px; display: inline; margin: 0;"><span id="result-auto">0</span> / 100점</span>
+          <span style="color: #8b919f; font-size: 13px;"> (자동 채점분)</span>
+        </div>
+      </div>
+
+      <a href="index.html" class="btn secondary" style="display:inline-block; text-decoration:none;">시험 선택으로</a>
+    </div>
+  </div>
+
+</div>
+
+<script src="config.js"></script>
+<script src="exam-data-meta-ads.js"></script>
+<script>
+// ============== Supabase 클라이언트 ==============
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// ============== 전역 상태 ==============
+let currentAttemptId = null;
+let currentUserName = "";
+let answers = {
+  mcq: {},
+  short: {},
+  essay: {},
+  storyline: "",
+};
+let examEndTime = null;
+let timerInterval = null;
+
+// ============== 초기 화면 세팅 ==============
+document.getElementById("exam-title").textContent = EXAM_TITLE;
+document.getElementById("exam-subtitle").textContent = EXAM_SUBTITLE;
+if (EXAM_DURATION_MIN > 0) {
+  document.getElementById("exam-duration-display").textContent = EXAM_DURATION_MIN + "분";
+} else {
+  document.getElementById("exam-duration-display").textContent = "제한 없음";
+}
+
+// ============== 시험 시작 ==============
+document.getElementById("btn-start").addEventListener("click", async () => {
+  const name = document.getElementById("input-name").value.trim();
+  const errBox = document.getElementById("start-error");
+  errBox.style.display = "none";
+
+  if (!name) {
+    errBox.textContent = "이름을 입력하세요.";
+    errBox.style.display = "block";
+    return;
+  }
+
+  const btn = document.getElementById("btn-start");
+  btn.disabled = true;
+  btn.textContent = "시작 중...";
+
+  try {
+    // Supabase에 응시 기록 생성
+    const today = new Date().toISOString().split("T")[0];
+    const { data, error } = await supabase
+      .from("exam_attempts")
+      .insert({ name, exam_date: today, exam_type: "meta-ads" })
+      .select()
+      .single();
+
+    if (error) {
+      if (error.code === "23505") {
+        // unique violation
+        errBox.textContent = "오늘 이미 이 이름으로 이 시험에 응시한 기록이 있습니다.";
+      } else {
+        errBox.textContent = "오류: " + error.message;
+      }
+      errBox.style.display = "block";
+      btn.disabled = false;
+      btn.textContent = "시험 시작";
+      return;
+    }
+
+    currentAttemptId = data.id;
+    currentUserName = name;
+    document.getElementById("user-name-display").textContent = name;
+
+    // 화면 전환
+    document.getElementById("screen-start").style.display = "none";
+    document.getElementById("screen-exam").style.display = "block";
+    renderExam();
+    startTimer();
+  } catch (e) {
+    errBox.textContent = "연결 오류: " + e.message;
+    errBox.style.display = "block";
+    btn.disabled = false;
+    btn.textContent = "시험 시작";
+  }
+});
+
+// ============== 시험 화면 렌더링 ==============
+function renderExam() {
+  // 객관식
+  const mcqEl = document.getElementById("mcq-container");
+  mcqEl.innerHTML = "";
+  MCQ.forEach((q, idx) => {
+    const div = document.createElement("div");
+    div.className = "q";
+    div.innerHTML = `
+      <div><span class="q-num">${idx + 1}.</span><span class="q-text">${escapeHtml(q.text)}</span><span class="q-points">(${q.points}점)</span></div>
+      <div class="choices">
+        ${q.choices.map((c, i) => `
+          <label data-q="${q.id}" data-v="${i + 1}">
+            <input type="radio" name="mcq-${q.id}" value="${i + 1}">
+            <span>${i + 1}) ${escapeHtml(c)}</span>
+          </label>
+        `).join("")}
+      </div>
+    `;
+    mcqEl.appendChild(div);
+  });
+
+  // 단답형
+  const shortEl = document.getElementById("short-container");
+  shortEl.innerHTML = "";
+  SHORT.forEach((q, idx) => {
+    const div = document.createElement("div");
+    div.className = "q";
+    div.innerHTML = `
+      <div><span class="q-num">${MCQ.length + idx + 1}.</span><span class="q-text">${escapeHtml(q.text)}</span><span class="q-points">(${q.points}점)</span></div>
+      <textarea class="short-input" data-q="${q.id}" placeholder="답안을 입력하세요"></textarea>
+    `;
+    shortEl.appendChild(div);
+  });
+
+  // 서술형
+  const essayEl = document.getElementById("essay-container");
+  essayEl.innerHTML = "";
+  ESSAY.forEach((q, idx) => {
+    const num = MCQ.length + SHORT.length + idx + 1;
+    const div = document.createElement("div");
+    div.className = "q";
+    div.innerHTML = `
+      <div><span class="q-num">${num}.</span><span class="q-text">[${escapeHtml(q.title)}]</span><span class="q-points">(${q.points}점)</span></div>
+      <div class="scenario">${escapeHtml(q.scenario)}</div>
+      <div style="margin-top: 10px; font-weight: 600;">Q. ${escapeHtml(q.question)}</div>
+      <textarea class="essay-input" data-q="${q.id}" placeholder="답안을 서술하세요. 자료의 원칙과 수치를 근거로 제시할수록 점수가 높습니다."></textarea>
+    `;
+    essayEl.appendChild(div);
+  });
+
+  // 스토리라인 (실전 과제, 30점)
+  const storyEl = document.getElementById("storyline-container");
+  storyEl.innerHTML = "";
+  const sNum = MCQ.length + SHORT.length + ESSAY.length + 1;
+  const sDiv = document.createElement("div");
+  sDiv.className = "q";
+  sDiv.innerHTML = `
+    <div><span class="q-num">${sNum}.</span><span class="q-text">[${escapeHtml(STORYLINE.title)}]</span><span class="q-points">(${STORYLINE.points}점)</span></div>
+    <div class="scenario">${escapeHtml(STORYLINE.brief)}</div>
+    <div style="margin-top: 10px; font-weight: 600; white-space: pre-wrap;">Q. ${escapeHtml(STORYLINE.question)}</div>
+    <textarea class="essay-input" id="storyline-input" style="min-height: 320px;" placeholder="장면 1 → ...&#10;장면 2 → ...&#10;장면 3 → ...&#10;...&#10;마무리 CTA: ...&#10;타겟 단계: ..."></textarea>
+  `;
+  storyEl.appendChild(sDiv);
+
+  // 이벤트 바인딩
+  document.querySelectorAll('.choices label').forEach(label => {
+    label.addEventListener("click", () => {
+      const qid = label.dataset.q;
+      const v = label.dataset.v;
+      // 동일 그룹 라디오 선택 표시
+      label.parentElement.querySelectorAll("label").forEach(l => l.classList.remove("selected"));
+      label.classList.add("selected");
+      const radio = label.querySelector('input[type="radio"]');
+      if (radio) radio.checked = true;
+      answers.mcq[qid] = v;
+      updateProgress();
+      saveDraft();
+    });
+  });
+
+  document.querySelectorAll('.short-input').forEach(el => {
+    el.addEventListener("input", () => {
+      answers.short[el.dataset.q] = el.value;
+      updateProgress();
+      saveDraft();
+    });
+  });
+
+  document.querySelectorAll('.essay-input').forEach(el => {
+    el.addEventListener("input", () => {
+      if (el.id === "storyline-input") {
+        answers.storyline = el.value;
+      } else {
+        answers.essay[el.dataset.q] = el.value;
+      }
+      updateProgress();
+      saveDraft();
+    });
+  });
+
+  updateProgress();
+}
+
+function updateProgress() {
+  const total = MCQ.length + SHORT.length + ESSAY.length + 1; // +1 for storyline
+  let done = 0;
+  MCQ.forEach(q => { if (answers.mcq[q.id]) done++; });
+  SHORT.forEach(q => { if ((answers.short[q.id] || "").trim().length > 0) done++; });
+  ESSAY.forEach(q => { if ((answers.essay[q.id] || "").trim().length > 0) done++; });
+  if ((answers.storyline || "").trim().length > 0) done++;
+  document.getElementById("progress-text").textContent = `${done} / ${total} 문항 작성`;
+  document.getElementById("progress-fill").style.width = (done / total * 100) + "%";
+}
+
+// ============== 임시 저장 (디바운스) ==============
+let saveTimer = null;
+function saveDraft() {
+  if (!currentAttemptId) return;
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(async () => {
+    await supabase.from("exam_attempts").update({
+      mcq_answers: answers.mcq,
+      short_answers: answers.short,
+      essay_answers: answers.essay,
+      storyline_answer: answers.storyline,
+    }).eq("id", currentAttemptId);
+  }, 1500);
+}
+
+// ============== 타이머 ==============
+function startTimer() {
+  if (EXAM_DURATION_MIN <= 0) {
+    document.getElementById("timer-display").textContent = "";
+    return;
+  }
+  examEndTime = Date.now() + EXAM_DURATION_MIN * 60 * 1000;
+  timerInterval = setInterval(() => {
+    const remain = examEndTime - Date.now();
+    if (remain <= 0) {
+      clearInterval(timerInterval);
+      document.getElementById("timer-display").textContent = "00:00";
+      alert("시험 시간이 종료되었습니다. 자동 제출됩니다.");
+      submitExam();
+      return;
+    }
+    const mm = Math.floor(remain / 60000);
+    const ss = Math.floor((remain % 60000) / 1000);
+    const el = document.getElementById("timer-display");
+    el.textContent = `남은 시간 ${String(mm).padStart(2, "0")}:${String(ss).padStart(2, "0")}`;
+    el.classList.remove("warning", "danger");
+    if (mm < 10) el.classList.add("warning");
+    if (mm < 3) el.classList.add("danger");
+  }, 1000);
+}
+
+// ============== 제출 ==============
+document.getElementById("btn-submit").addEventListener("click", async () => {
+  if (!confirm("정말 제출하시겠습니까? 제출 후에는 수정할 수 없습니다.")) return;
+  await submitExam();
+});
+
+async function submitExam() {
+  const btn = document.getElementById("btn-submit");
+  btn.disabled = true;
+  btn.textContent = "제출 중...";
+
+  // 자동 채점
+  const grading = autoGrade(answers.mcq, answers.short);
+
+  // Supabase 업데이트
+  const { error } = await supabase.from("exam_attempts").update({
+    mcq_answers: answers.mcq,
+    short_answers: answers.short,
+    essay_answers: answers.essay,
+    storyline_answer: answers.storyline,
+    submitted_at: new Date().toISOString(),
+    auto_score: grading.total,
+    essay_status: "pending",
+    storyline_status: "pending",
+  }).eq("id", currentAttemptId);
+
+  if (error) {
+    alert("제출 오류: " + error.message);
+    btn.disabled = false;
+    btn.textContent = "최종 제출";
+    return;
+  }
+
+  // 결과 화면
+  if (timerInterval) clearInterval(timerInterval);
+  document.getElementById("screen-exam").style.display = "none";
+  document.getElementById("screen-result").style.display = "block";
+  document.getElementById("result-name").textContent = currentUserName;
+  document.getElementById("result-mcq").textContent = grading.mcq.score;
+  document.getElementById("result-short").textContent = grading.short.score;
+  document.getElementById("result-auto").textContent = grading.total;
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+// ============== 유틸 ==============
+function escapeHtml(s) {
+  return (s || "").replace(/[&<>"']/g, ch => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+  }[ch]));
+}
+
+// 페이지 이탈 경고
+window.addEventListener("beforeunload", e => {
+  if (currentAttemptId && document.getElementById("screen-exam").style.display !== "none") {
+    e.preventDefault();
+    e.returnValue = "";
+  }
+});
+</script>
+</body>
+</html>

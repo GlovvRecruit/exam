@@ -1,0 +1,821 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>채점 어드민 - Glovv 인턴 시험</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "맑은 고딕", "Malgun Gothic", system-ui, sans-serif;
+    background: #1f2330; color: #e6e9f0; margin: 0; padding: 24px 12px;
+    line-height: 1.6;
+  }
+  .container { max-width: 1100px; margin: 0 auto; }
+  h1 { margin: 0 0 16px; font-size: 22px; }
+  .panel {
+    background: #2a2f3e; border-radius: 12px; padding: 20px 24px;
+    margin-bottom: 16px; border: 1px solid #3a4055;
+  }
+  .login { max-width: 420px; margin: 60px auto; text-align: center; }
+  .login input {
+    width: 100%; padding: 12px 14px; font-size: 16px; border-radius: 8px;
+    border: 1px solid #3a4055; background: #1f2330; color: #e6e9f0;
+    margin: 12px 0;
+  }
+  .btn {
+    background: #2e75b6; color: #fff; border: 0; padding: 10px 20px;
+    border-radius: 8px; font-size: 14px; font-weight: 700; cursor: pointer;
+  }
+  .btn:hover { background: #225d96; }
+  .btn.success { background: #2d8a4e; }
+  .btn.success:hover { background: #226e3e; }
+  .btn.ghost { background: transparent; color: #97a1b8; border: 1px solid #3a4055; }
+  .filter-group {
+    display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px;
+  }
+  .filter-btn {
+    background: transparent; color: #97a1b8; border: 1px solid #3a4055;
+    padding: 6px 14px; border-radius: 99px; cursor: pointer; font-size: 13px;
+    font-family: inherit;
+  }
+  .filter-btn.active { background: #2e75b6; color: #fff; border-color: #2e75b6; }
+  .filter-btn:hover:not(.active) { border-color: #5a6175; color: #c4ccdb; }
+  /* 리스트 */
+  table { width: 100%; border-collapse: collapse; }
+  th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid #3a4055; font-size: 14px; }
+  th { color: #97a1b8; font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+  tr:hover { background: rgba(255,255,255,0.03); }
+  .badge {
+    display: inline-block; padding: 3px 9px; border-radius: 99px;
+    font-size: 11px; font-weight: 700;
+  }
+  .badge.pending { background: #5a3e1c; color: #f6c688; }
+  .badge.graded { background: #1f4a31; color: #7dd8a3; }
+  .badge.live { background: #4a3a1f; color: #f4d97a; }
+  .badge.exam-onboarding { background: rgba(46, 117, 182, 0.2); color: #6fb2e8; }
+  .badge.exam-sales { background: rgba(182, 90, 46, 0.2); color: #e89870; }
+  .badge.exam-feedback { background: rgba(46, 182, 146, 0.2); color: #6fcbb0; }
+  .badge.exam-meta-ads { background: rgba(139, 46, 182, 0.2); color: #b070e0; }
+  .score-big { font-size: 18px; font-weight: 800; color: #4d9bda; }
+  .empty {
+    text-align: center; padding: 60px 20px; color: #97a1b8; font-size: 14px;
+  }
+  /* 채점 화면 */
+  .grading-back {
+    color: #97a1b8; text-decoration: none; font-size: 14px; cursor: pointer;
+    display: inline-block; margin-bottom: 14px;
+  }
+  .grading-back:hover { color: #e6e9f0; }
+  .student-header {
+    display: flex; justify-content: space-between; align-items: center;
+    padding-bottom: 16px; border-bottom: 1px solid #3a4055; margin-bottom: 18px;
+    flex-wrap: wrap; gap: 12px;
+  }
+  .student-name { font-size: 22px; font-weight: 800; }
+  .student-meta { color: #97a1b8; font-size: 13px; }
+  .auto-summary {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 8px; margin-bottom: 20px;
+  }
+  .summary-card {
+    background: #1f2330; padding: 12px 14px; border-radius: 8px;
+    border: 1px solid #3a4055;
+  }
+  .summary-card .label { color: #97a1b8; font-size: 12px; }
+  .summary-card .value { font-size: 18px; font-weight: 800; margin-top: 2px; }
+  details.qbox {
+    background: #1f2330; border: 1px solid #3a4055; border-radius: 8px;
+    margin-bottom: 8px; padding: 0;
+  }
+  details.qbox summary {
+    padding: 10px 14px; cursor: pointer; font-size: 13.5px;
+    display: flex; justify-content: space-between; align-items: center; gap: 12px;
+  }
+  details.qbox summary:hover { background: rgba(255,255,255,0.02); }
+  details.qbox > div { padding: 0 14px 14px; font-size: 13px; color: #c4ccdb; }
+  details.qbox > div > div { padding: 4px 0; }
+  .ok { color: #7dd8a3; font-weight: 700; }
+  .ng { color: #f17a8a; font-weight: 700; }
+  .partial { color: #f6c688; font-weight: 700; }
+  /* 서술형 */
+  .essay-block {
+    background: #1f2330; border: 1px solid #3a4055; border-radius: 10px;
+    padding: 16px; margin-bottom: 14px;
+  }
+  .essay-title { font-size: 15px; font-weight: 700; color: #e6e9f0; margin-bottom: 6px; }
+  .essay-scenario { font-size: 12.5px; color: #97a1b8; margin-bottom: 8px; }
+  .essay-question {
+    font-size: 13.5px; color: #c4ccdb; margin-bottom: 12px;
+    padding: 10px; background: rgba(0,0,0,0.15); border-radius: 6px;
+  }
+  .essay-answer {
+    font-size: 13.5px; color: #e6e9f0; padding: 12px; background: rgba(46, 117, 182, 0.06);
+    border-left: 3px solid #2e75b6; border-radius: 4px; margin-bottom: 12px;
+    white-space: pre-wrap; min-height: 50px;
+  }
+  .essay-answer.empty-answer { color: #97a1b8; font-style: italic; }
+  .rubric { display: flex; flex-direction: column; gap: 8px; }
+  .rubric-row {
+    display: flex; align-items: center; gap: 10px; padding: 6px 0;
+    border-bottom: 1px dashed #3a4055;
+  }
+  .rubric-row:last-child { border-bottom: 0; }
+  .rubric-row label { flex: 1; font-size: 13px; color: #c4ccdb; }
+  .rubric-row input[type="number"] {
+    width: 64px; padding: 6px 8px; font-size: 14px; text-align: center;
+    border-radius: 6px; border: 1px solid #3a4055; background: #1f2330; color: #e6e9f0;
+  }
+  .essay-total { text-align: right; font-size: 13px; color: #97a1b8; margin-top: 8px; }
+  /* memorization (1~3번 시험) 채점 화면 */
+  .memo-q {
+    background: #1f2330; border: 1px solid #3a4055; border-radius: 8px;
+    padding: 14px; margin-bottom: 10px;
+  }
+  .memo-q-head {
+    display: flex; justify-content: space-between; align-items: flex-start;
+    gap: 12px; margin-bottom: 8px;
+  }
+  .memo-q-title { font-size: 14px; font-weight: 700; }
+  .memo-q-section { font-size: 11px; color: #97a1b8; margin-bottom: 4px; }
+  .memo-q-score {
+    font-size: 13px; font-weight: 800; color: #4d9bda; white-space: nowrap;
+  }
+  .memo-q-score.full { color: #7dd8a3; }
+  .memo-q-score.partial { color: #f6c688; }
+  .memo-q-score.zero { color: #f17a8a; }
+  .memo-q-answer {
+    font-size: 13px; color: #e6e9f0; padding: 10px;
+    background: rgba(46, 117, 182, 0.06); border-left: 3px solid #2e75b6;
+    border-radius: 4px; white-space: pre-wrap; min-height: 30px;
+  }
+  .memo-q-answer.empty-answer { color: #97a1b8; font-style: italic; }
+  .memo-q-reference {
+    font-size: 12.5px; color: #c4ccdb; padding: 10px;
+    background: rgba(255,255,255,0.03); border-left: 3px solid #4a5160;
+    border-radius: 4px; white-space: pre-wrap; margin-top: 8px;
+  }
+  .memo-q-keywords {
+    font-size: 11.5px; color: #97a1b8; margin-top: 6px;
+  }
+  /* 저장 영역 */
+  .save-area {
+    position: sticky; bottom: 16px; background: #2a2f3e; border-radius: 10px;
+    padding: 14px 20px; border: 1px solid #4d9bda;
+    display: flex; justify-content: space-between; align-items: center;
+    margin-top: 24px; flex-wrap: wrap; gap: 10px;
+  }
+  .save-area .total-display {
+    font-size: 22px; font-weight: 800; color: #7dd8a3;
+  }
+  .toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+    background: #1f4a31; color: #7dd8a3; padding: 12px 24px; border-radius: 99px;
+    font-size: 14px; font-weight: 700; opacity: 0;
+    transition: opacity .2s; pointer-events: none; z-index: 1000;
+  }
+  .toast.show { opacity: 1; }
+  @media (max-width: 600px) {
+    .auto-summary { grid-template-columns: 1fr 1fr; }
+    .student-header { flex-direction: column; align-items: flex-start; }
+    th, td { padding: 8px 6px; font-size: 12px; }
+    th:nth-child(4), td:nth-child(4),
+    th:nth-child(5), td:nth-child(5) { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+
+  <!-- 로그인 화면 -->
+  <div id="screen-login">
+    <div class="panel login">
+      <h1>관리자 로그인</h1>
+      <p style="color: #97a1b8; font-size: 14px;">비밀번호를 입력하세요.</p>
+      <input type="password" id="input-pw" placeholder="어드민 비밀번호" autocomplete="off">
+      <button class="btn" id="btn-login">로그인</button>
+      <div id="login-error" style="margin-top: 12px; color: #f17a8a; font-size: 13px; display: none;"></div>
+    </div>
+  </div>
+
+  <!-- 응시자 목록 -->
+  <div id="screen-list" style="display:none;">
+    <h1>응시자 목록</h1>
+    <div class="panel">
+      <div class="filter-group" id="filter-group">
+        <button class="filter-btn active" data-filter="all">전체</button>
+        <button class="filter-btn" data-filter="onboarding">온보딩</button>
+        <button class="filter-btn" data-filter="sales">세일즈</button>
+        <button class="filter-btn" data-filter="feedback">피드백</button>
+        <button class="filter-btn" data-filter="meta-ads">메타광고</button>
+      </div>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+        <span style="color: #97a1b8; font-size: 13px;" id="list-meta">총 0명</span>
+        <button class="btn ghost" id="btn-refresh">새로고침</button>
+      </div>
+      <div id="list-container"></div>
+    </div>
+  </div>
+
+  <!-- 채점 화면 -->
+  <div id="screen-grade" style="display:none;"></div>
+
+</div>
+
+<div class="toast" id="toast">저장됨</div>
+
+<script src="config.js"></script>
+<!-- 메타광고 데이터만 여기서 로드. 나머지 시험은 채점할 때 동적 로드 -->
+<script src="exam-data-meta-ads.js"></script>
+<script>
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// ============== 시험 종류 메타데이터 ==============
+const EXAM_TYPES = {
+  "onboarding": { label: "온보딩", emoji: "😊", dataFile: "exam-data-onboarding.js" },
+  "sales":      { label: "세일즈", emoji: "🚧", dataFile: "exam-data-sales.js" },
+  "feedback":   { label: "피드백", emoji: "📈", dataFile: "exam-data-feedback.js" },
+  "meta-ads":   { label: "메타광고", emoji: "📱", dataFile: "exam-data-meta-ads.js" },
+};
+
+// 동적으로 로드한 시험 데이터를 저장
+const examDataCache = {
+  "meta-ads": { MCQ, SHORT, ESSAY, STORYLINE, gradeMCQ, gradeShort },
+};
+
+// 1~3번 시험 데이터를 동적 로드
+async function loadMemorizationData(examType) {
+  if (examDataCache[examType]) return examDataCache[examType];
+  return new Promise((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src = EXAM_TYPES[examType].dataFile;
+    script.onload = () => {
+      // IIFE로 감싼 파일에서 window.examData<Type>으로 노출됨
+      const winKey = {
+        "onboarding": "examDataOnboarding",
+        "sales": "examDataSales",
+        "feedback": "examDataFeedback",
+      }[examType];
+      const data = window[winKey];
+      if (!data) {
+        reject(new Error(`window.${winKey}를 찾을 수 없습니다`));
+        return;
+      }
+      examDataCache[examType] = data;
+      resolve(data);
+    };
+    script.onerror = () => reject(new Error("스크립트 로드 실패: " + EXAM_TYPES[examType].dataFile));
+    document.head.appendChild(script);
+  });
+}
+
+// ============== 상태 ==============
+let allAttempts = [];
+let currentFilter = "all";
+
+// ============== 로그인 ==============
+document.getElementById("btn-login").addEventListener("click", () => {
+  const pw = document.getElementById("input-pw").value;
+  if (pw === ADMIN_PASSWORD) {
+    document.getElementById("screen-login").style.display = "none";
+    document.getElementById("screen-list").style.display = "block";
+    loadList();
+  } else {
+    const err = document.getElementById("login-error");
+    err.textContent = "비밀번호가 틀렸습니다.";
+    err.style.display = "block";
+  }
+});
+document.getElementById("input-pw").addEventListener("keydown", e => {
+  if (e.key === "Enter") document.getElementById("btn-login").click();
+});
+
+document.getElementById("btn-refresh").addEventListener("click", loadList);
+
+// 필터 버튼
+document.querySelectorAll(".filter-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".filter-btn").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    currentFilter = btn.dataset.filter;
+    renderList();
+  });
+});
+
+// ============== 응시자 목록 ==============
+async function loadList() {
+  const { data, error } = await supabase
+    .from("exam_attempts")
+    .select("*")
+    .order("started_at", { ascending: false });
+
+  if (error) {
+    document.getElementById("list-container").innerHTML =
+      `<div class="empty">로드 오류: ${escapeHtml(error.message)}</div>`;
+    return;
+  }
+  allAttempts = data;
+  renderList();
+}
+
+function renderList() {
+  const data = currentFilter === "all"
+    ? allAttempts
+    : allAttempts.filter(a => (a.exam_type || "meta-ads") === currentFilter);
+
+  document.getElementById("list-meta").textContent = `총 ${data.length}명`;
+
+  if (data.length === 0) {
+    document.getElementById("list-container").innerHTML =
+      `<div class="empty">해당 조건의 응시자가 없습니다.</div>`;
+    return;
+  }
+
+  const rows = data.map(a => {
+    const examType = a.exam_type || "meta-ads";
+    const examLabel = EXAM_TYPES[examType]?.label || examType;
+    const submitted = !!a.submitted_at;
+
+    // 메타광고: essay/storyline 둘 다 채점 완료여야 graded
+    // 1~3번 시험: 제출 시 자동으로 essay_status='graded'로 됨 → 그냥 graded 표시
+    const isMetaAds = examType === "meta-ads";
+    const fullyGraded = isMetaAds
+      ? (a.essay_status === "graded" && a.storyline_status === "graded")
+      : (a.essay_status === "graded");
+
+    const statusBadge = submitted
+      ? (fullyGraded
+          ? '<span class="badge graded">채점 완료</span>'
+          : '<span class="badge pending">채점 대기</span>')
+      : '<span class="badge live">응시 중</span>';
+
+    return `
+      <tr data-id="${a.id}" style="cursor:${submitted ? 'pointer' : 'default'};">
+        <td data-label="이름"><b>${escapeHtml(a.name)}</b></td>
+        <td data-label="시험"><span class="badge exam-${examType}">${examLabel}</span></td>
+        <td data-label="응시일">${a.exam_date}</td>
+        <td data-label="제출">${a.submitted_at ? formatTime(a.submitted_at) : "—"}</td>
+        <td data-label="상태">${statusBadge}</td>
+        <td data-label="자동" class="score-big">${submitted ? a.auto_score : "—"}</td>
+        <td data-label="합계" class="score-big">${submitted ? (fullyGraded ? a.total_score : "채점중") : "—"}</td>
+      </tr>
+    `;
+  }).join("");
+
+  document.getElementById("list-container").innerHTML = `
+    <div style="overflow-x: auto;">
+    <table>
+      <thead>
+        <tr>
+          <th>이름</th><th>시험</th><th>응시일</th><th>제출</th><th>상태</th>
+          <th>자동</th><th>합계</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+    </div>
+  `;
+
+  document.querySelectorAll("tbody tr").forEach(tr => {
+    const a = data.find(x => x.id === tr.dataset.id);
+    if (a && a.submitted_at) {
+      tr.addEventListener("click", () => openGrading(a));
+    }
+  });
+}
+
+// ============== 채점 화면 분기 ==============
+async function openGrading(attempt) {
+  const examType = attempt.exam_type || "meta-ads";
+  document.getElementById("screen-list").style.display = "none";
+  const grade = document.getElementById("screen-grade");
+  grade.style.display = "block";
+  grade.innerHTML = '<div class="panel"><p style="color:#97a1b8;">로딩 중...</p></div>';
+
+  try {
+    if (examType === "meta-ads") {
+      renderMetaAdsGrading(attempt);
+    } else {
+      const data = await loadMemorizationData(examType);
+      renderMemorizationGrading(attempt, examType, data);
+    }
+  } catch (e) {
+    grade.innerHTML = `<div class="panel"><p style="color:#f17a8a;">로드 오류: ${escapeHtml(e.message)}</p></div>`;
+  }
+}
+
+// ====================================================
+// PART A. 메타광고 채점 화면 (기존 로직)
+// ====================================================
+function renderMetaAdsGrading(attempt) {
+  const grade = document.getElementById("screen-grade");
+  const mcqAnswers = attempt.mcq_answers || {};
+  const shortAnswers = attempt.short_answers || {};
+  const essayAnswers = attempt.essay_answers || {};
+  const existingGrading = attempt.essay_grading || {};
+  const storylineAnswer = attempt.storyline_answer || "";
+  const existingStoryGrading = attempt.storyline_grading || {};
+
+  const mcqGrade = gradeMCQ(mcqAnswers);
+  const shortGrade = gradeShort(shortAnswers);
+
+  // 객관식 상세
+  const mcqDetailHtml = MCQ.map((q, i) => {
+    const d = mcqGrade.detail.find(x => x.id === q.id);
+    const userTxt = d.user ? `${d.user}) ${escapeHtml(q.choices[d.user - 1] || '')}` : "(미응답)";
+    const correctTxt = `${q.answer}) ${escapeHtml(q.choices[q.answer - 1])}`;
+    const mark = d.ok ? `<span class="ok">정답 (+${q.points})</span>` : `<span class="ng">오답 (0)</span>`;
+    return `
+      <details class="qbox">
+        <summary>
+          <span>Q${i + 1}. ${escapeHtml(q.text.slice(0, 60))}${q.text.length > 60 ? '...' : ''}</span>
+          <span>${mark}</span>
+        </summary>
+        <div>
+          <div><b>응시자 응답:</b> ${userTxt}</div>
+          <div><b>정답:</b> ${correctTxt}</div>
+        </div>
+      </details>
+    `;
+  }).join("");
+
+  // 단답형 상세
+  const shortDetailHtml = SHORT.map((q, i) => {
+    const d = shortGrade.detail.find(x => x.id === q.id);
+    const userTxt = d.user.trim() || "(미응답)";
+    let mark;
+    if (d.earned === q.points) mark = `<span class="ok">만점 (+${d.earned})</span>`;
+    else if (d.earned > 0) mark = `<span class="partial">부분 (+${d.earned}/${q.points})</span>`;
+    else mark = `<span class="ng">오답 (0/${q.points})</span>`;
+    return `
+      <details class="qbox">
+        <summary>
+          <span>Q${MCQ.length + i + 1}. ${escapeHtml(q.text.slice(0, 60))}${q.text.length > 60 ? '...' : ''}</span>
+          <span>${mark}</span>
+        </summary>
+        <div>
+          <div><b>응시자 응답:</b> ${escapeHtml(userTxt)}</div>
+          <div><b>모범 답안:</b> ${escapeHtml(q.answer_text)}</div>
+        </div>
+      </details>
+    `;
+  }).join("");
+
+  // 서술형
+  const essayHtml = ESSAY.map((q, i) => {
+    const num = MCQ.length + SHORT.length + i + 1;
+    const userAns = essayAnswers[q.id] || "";
+    const savedScores = existingGrading[q.id] || {};
+    const rubricRows = q.rubric.map((r, ri) => {
+      const val = savedScores[`r${ri}`] !== undefined ? savedScores[`r${ri}`] : "";
+      return `
+        <div class="rubric-row">
+          <label>${escapeHtml(r.label)}</label>
+          <span style="color:#97a1b8; font-size:12px;">/ ${r.max}점</span>
+          <input type="number" min="0" max="${r.max}" step="0.5" value="${val}"
+                 data-qid="${q.id}" data-rubric="${ri}" data-max="${r.max}">
+        </div>
+      `;
+    }).join("");
+
+    return `
+      <div class="essay-block" data-qid="${q.id}">
+        <div class="essay-title">${num}. [${escapeHtml(q.title)}] (${q.points}점)</div>
+        <div class="essay-scenario">${escapeHtml(q.scenario)}</div>
+        <div class="essay-question">Q. ${escapeHtml(q.question)}</div>
+        <div class="essay-answer ${userAns.trim() ? '' : 'empty-answer'}">${escapeHtml(userAns) || "(미응답)"}</div>
+        <div class="rubric">${rubricRows}</div>
+        <div class="essay-total">소계: <span class="essay-subtotal" data-qid="${q.id}">0</span> / ${q.points}점</div>
+      </div>
+    `;
+  }).join("");
+
+  // 스토리라인
+  const sNum = MCQ.length + SHORT.length + ESSAY.length + 1;
+  const storyRubricRows = STORYLINE.rubric.map((r, ri) => {
+    const val = existingStoryGrading[`r${ri}`] !== undefined ? existingStoryGrading[`r${ri}`] : "";
+    return `
+      <div class="rubric-row" style="align-items: flex-start; padding: 10px 0;">
+        <div style="flex: 1;">
+          <div style="color: #e6e9f0; font-weight: 600;">${escapeHtml(r.label)}</div>
+          <div style="color: #97a1b8; font-size: 12px; margin-top: 2px;">${escapeHtml(r.detail || "")}</div>
+        </div>
+        <span style="color:#97a1b8; font-size:12px; white-space: nowrap;">/ ${r.max}점</span>
+        <input type="number" min="0" max="${r.max}" step="0.5" value="${val}"
+               data-storyline-rubric="${ri}" data-max="${r.max}">
+      </div>
+    `;
+  }).join("");
+
+  const storylineHtml = `
+    <div class="essay-block" style="border: 1px solid #4d9bda;">
+      <div class="essay-title" style="color: #4d9bda;">${sNum}. [${escapeHtml(STORYLINE.title)}] (${STORYLINE.points}점)</div>
+      <div class="essay-scenario">${escapeHtml(STORYLINE.brief)}</div>
+      <div class="essay-question" style="white-space: pre-wrap;">Q. ${escapeHtml(STORYLINE.question)}</div>
+      <div class="essay-answer ${storylineAnswer.trim() ? '' : 'empty-answer'}" style="border-left-color: #4d9bda; min-height: 120px;">${escapeHtml(storylineAnswer) || "(미응답)"}</div>
+      <details class="qbox" style="margin-top: 10px;">
+        <summary style="color: #4d9bda;">📌 모범 답안 예시 펼쳐보기 (채점 참고용)</summary>
+        <div style="white-space: pre-wrap; font-size: 13px; color: #c4ccdb; padding: 10px 14px 14px;">${escapeHtml(STORYLINE.reference_example)}</div>
+      </details>
+      <div class="rubric" style="margin-top: 14px;">${storyRubricRows}</div>
+      <div class="essay-total">소계: <span id="storyline-subtotal">0</span> / ${STORYLINE.points}점</div>
+    </div>
+  `;
+
+  grade.innerHTML = `
+    <span class="grading-back" id="btn-back">← 목록으로 돌아가기</span>
+    <div class="panel">
+      <div class="student-header">
+        <div>
+          <div class="student-name">${escapeHtml(attempt.name)} <span class="badge exam-meta-ads" style="font-size:12px; vertical-align: middle;">메타광고</span></div>
+          <div class="student-meta">응시일 ${attempt.exam_date} · 제출 ${formatTime(attempt.submitted_at)}</div>
+        </div>
+        <div style="text-align: right;">
+          <div style="font-size: 12px; color: #97a1b8;">자동 채점</div>
+          <div class="score-big">${attempt.auto_score} / 40</div>
+        </div>
+      </div>
+
+      <div class="auto-summary">
+        <div class="summary-card"><div class="label">객관식</div><div class="value">${mcqGrade.score} / 20</div></div>
+        <div class="summary-card"><div class="label">단답형</div><div class="value">${shortGrade.score} / 20</div></div>
+        <div class="summary-card"><div class="label">서술형 (수동)</div><div class="value" id="essay-total-display">0 / 30</div></div>
+        <div class="summary-card"><div class="label">스토리라인 (수동)</div><div class="value" id="storyline-total-display">0 / 30</div></div>
+        <div class="summary-card"><div class="label">최종</div><div class="value" id="grand-total" style="color:#7dd8a3;">${attempt.auto_score} / 100</div></div>
+      </div>
+
+      <h2 style="font-size:16px; margin: 16px 0 8px;">PART 1. 객관식 자동 채점 (확인용)</h2>
+      ${mcqDetailHtml}
+
+      <h2 style="font-size:16px; margin: 20px 0 8px;">PART 2. 단답형 자동 채점</h2>
+      <p style="font-size:12px; color:#97a1b8; margin:0 0 10px;">키워드 매칭이라 잘못 채점될 수도 있습니다. 모범답안과 비교해보세요.</p>
+      ${shortDetailHtml}
+
+      <h2 style="font-size:16px; margin: 24px 0 12px;">PART 3. 서술형 채점 (수동)</h2>
+      ${essayHtml}
+
+      <h2 style="font-size:16px; margin: 24px 0 12px; color: #4d9bda;">PART 4. 스토리라인 채점 (수동, 30점)</h2>
+      ${storylineHtml}
+
+      <div class="save-area">
+        <div>
+          <div style="font-size:12px;color:#97a1b8;">최종 점수</div>
+          <div class="total-display" id="save-total">${attempt.auto_score} / 100</div>
+        </div>
+        <button class="btn success" id="btn-save">채점 저장</button>
+      </div>
+    </div>
+  `;
+
+  document.getElementById("btn-back").addEventListener("click", goBack);
+  document.querySelectorAll('input[data-rubric]').forEach(el => {
+    el.addEventListener("input", () => recalcMetaAds(attempt.auto_score));
+  });
+  document.querySelectorAll('input[data-storyline-rubric]').forEach(el => {
+    el.addEventListener("input", () => recalcMetaAds(attempt.auto_score));
+  });
+  document.getElementById("btn-save").addEventListener("click", async () => {
+    await saveMetaAdsGrading(attempt.id, attempt.auto_score);
+  });
+
+  recalcMetaAds(attempt.auto_score);
+  window.scrollTo(0, 0);
+}
+
+function recalcMetaAds(autoScore) {
+  let essayTotal = 0;
+  const essayGrading = {};
+  ESSAY.forEach(q => {
+    let sub = 0;
+    const obj = {};
+    q.rubric.forEach((r, ri) => {
+      const el = document.querySelector(`input[data-qid="${q.id}"][data-rubric="${ri}"]`);
+      let v = parseFloat(el.value);
+      if (isNaN(v)) v = 0;
+      const max = parseFloat(el.dataset.max);
+      if (v > max) { v = max; el.value = max; }
+      if (v < 0) { v = 0; el.value = 0; }
+      obj[`r${ri}`] = v;
+      sub += v;
+    });
+    essayGrading[q.id] = obj;
+    document.querySelector(`.essay-subtotal[data-qid="${q.id}"]`).textContent = sub;
+    essayTotal += sub;
+  });
+
+  let storyTotal = 0;
+  const storyGrading = {};
+  STORYLINE.rubric.forEach((r, ri) => {
+    const el = document.querySelector(`input[data-storyline-rubric="${ri}"]`);
+    let v = parseFloat(el.value);
+    if (isNaN(v)) v = 0;
+    const max = parseFloat(el.dataset.max);
+    if (v > max) { v = max; el.value = max; }
+    if (v < 0) { v = 0; el.value = 0; }
+    storyGrading[`r${ri}`] = v;
+    storyTotal += v;
+  });
+
+  document.getElementById("essay-total-display").textContent = essayTotal + " / 30";
+  document.getElementById("storyline-subtotal").textContent = storyTotal;
+  document.getElementById("storyline-total-display").textContent = storyTotal + " / 30";
+  const grand = autoScore + essayTotal + storyTotal;
+  document.getElementById("grand-total").textContent = grand + " / 100";
+  document.getElementById("save-total").textContent = grand + " / 100";
+  return { essayTotal, essayGrading, storyTotal, storyGrading };
+}
+
+async function saveMetaAdsGrading(attemptId, autoScore) {
+  const { essayTotal, essayGrading, storyTotal, storyGrading } = recalcMetaAds(autoScore);
+  const btn = document.getElementById("btn-save");
+  btn.disabled = true;
+  btn.textContent = "저장 중...";
+  const { error } = await supabase.from("exam_attempts").update({
+    essay_score: essayTotal,
+    essay_grading: essayGrading,
+    essay_status: "graded",
+    storyline_score: storyTotal,
+    storyline_grading: storyGrading,
+    storyline_status: "graded",
+    graded_at: new Date().toISOString(),
+  }).eq("id", attemptId);
+  btn.disabled = false;
+  btn.textContent = "채점 저장";
+  if (error) {
+    alert("저장 오류: " + error.message);
+    return;
+  }
+  showToast("저장됨");
+}
+
+// ====================================================
+// PART B. 1~3번 시험 (서술식 암기) 채점 화면
+// ====================================================
+function renderMemorizationGrading(attempt, examType, data) {
+  const grade = document.getElementById("screen-grade");
+  const examLabel = EXAM_TYPES[examType].label;
+  const essayAnswers = attempt.essay_answers || {};
+
+  // 자동 채점 다시 돌려서 문항별 상세 가져오기 (저장된 auto_score와 일치할 것)
+  const grading = data.autoGradeMemorization(essayAnswers);
+
+  // 문항별 카드
+  const qHtml = data.ESSAY_QUESTIONS.map((q, i) => {
+    const detail = grading.detail.find(d => d.id === q.id);
+    const userAns = (essayAnswers[q.id] || "").trim();
+    let scoreClass = "zero";
+    if (detail.earned >= q.points) scoreClass = "full";
+    else if (detail.earned > 0) scoreClass = "partial";
+
+    return `
+      <div class="memo-q">
+        <div class="memo-q-head">
+          <div style="flex:1;">
+            <div class="memo-q-section">${escapeHtml(q.section)}</div>
+            <div class="memo-q-title">${i + 1}. ${escapeHtml(q.title)}</div>
+          </div>
+          <div class="memo-q-score ${scoreClass}">
+            ${detail.earned} / ${q.points}
+          </div>
+        </div>
+        <div style="font-size: 12.5px; color: #97a1b8; margin: 6px 0;">${escapeHtml(q.question)}</div>
+        <div class="memo-q-answer ${userAns ? '' : 'empty-answer'}">${escapeHtml(userAns) || "(미응답)"}</div>
+        <details class="qbox" style="margin-top: 8px;">
+          <summary style="font-size: 12px; color: #97a1b8;">모범 답안 펼쳐보기 (키워드 ${detail.matched_groups}/${detail.total_groups} 매칭)</summary>
+          <div>
+            <div class="memo-q-reference">${escapeHtml(q.answer_text)}</div>
+          </div>
+        </details>
+      </div>
+    `;
+  }).join("");
+
+  // 수동 가산/감점 입력 (말이 되는지, 문장 구조 평가용)
+  const manualAdj = attempt.essay_score || 0;
+
+  grade.innerHTML = `
+    <span class="grading-back" id="btn-back">← 목록으로 돌아가기</span>
+    <div class="panel">
+      <div class="student-header">
+        <div>
+          <div class="student-name">${escapeHtml(attempt.name)} <span class="badge exam-${examType}" style="font-size:12px; vertical-align: middle;">${escapeHtml(examLabel)}</span></div>
+          <div class="student-meta">응시일 ${attempt.exam_date} · 제출 ${formatTime(attempt.submitted_at)}</div>
+        </div>
+        <div style="text-align: right;">
+          <div style="font-size: 12px; color: #97a1b8;">자동 채점 (키워드)</div>
+          <div class="score-big">${attempt.auto_score} / 100</div>
+        </div>
+      </div>
+
+      <div class="auto-summary">
+        <div class="summary-card"><div class="label">키워드 자동</div><div class="value">${attempt.auto_score} / 100</div></div>
+        <div class="summary-card"><div class="label">수동 가산/감점</div><div class="value" id="manual-display">${manualAdj} 점</div></div>
+        <div class="summary-card"><div class="label">최종</div><div class="value" id="grand-total" style="color:#7dd8a3;">${attempt.auto_score + manualAdj} / 100</div></div>
+      </div>
+
+      <div class="panel" style="background: rgba(46, 117, 182, 0.1); border-color: #2e75b6; padding: 14px 18px;">
+        <div style="font-size: 14px; font-weight: 700; margin-bottom: 6px;">수동 가산/감점</div>
+        <p style="font-size: 12.5px; color: #c4ccdb; margin: 0 0 10px;">
+          자동 채점은 키워드 매칭 기준입니다. 답안이 말이 되는지, 문장 구조가 잘 작성되었는지를 보고 가산/감점하세요.
+          (음수 입력 시 감점)
+        </p>
+        <div style="display: flex; gap: 10px; align-items: center;">
+          <label style="color:#97a1b8; font-size:13px;">가산/감점 점수:</label>
+          <input type="number" id="manual-input" step="0.5" value="${manualAdj}"
+                 style="width: 80px; padding: 8px 10px; font-size: 14px; text-align: center;
+                        border-radius: 6px; border: 1px solid #3a4055; background: #1f2330; color: #e6e9f0;">
+          <span style="color:#97a1b8; font-size:12px;">점 (자동 점수에 더해짐)</span>
+        </div>
+      </div>
+
+      <h2 style="font-size:16px; margin: 24px 0 12px;">문항별 답안 검토</h2>
+      <p style="font-size: 12.5px; color: #97a1b8; margin: 0 0 12px;">
+        문항별로 답안을 살펴보고, 위 가산/감점 점수에 반영하세요.
+      </p>
+      ${qHtml}
+
+      <div class="save-area">
+        <div>
+          <div style="font-size:12px;color:#97a1b8;">최종 점수</div>
+          <div class="total-display" id="save-total">${attempt.auto_score + manualAdj} / 100</div>
+        </div>
+        <button class="btn success" id="btn-save">채점 저장</button>
+      </div>
+    </div>
+  `;
+
+  document.getElementById("btn-back").addEventListener("click", goBack);
+  document.getElementById("manual-input").addEventListener("input", () => recalcMemo(attempt.auto_score));
+  document.getElementById("btn-save").addEventListener("click", () => saveMemoGrading(attempt.id, attempt.auto_score));
+
+  recalcMemo(attempt.auto_score);
+  window.scrollTo(0, 0);
+}
+
+function recalcMemo(autoScore) {
+  const input = document.getElementById("manual-input");
+  let v = parseFloat(input.value);
+  if (isNaN(v)) v = 0;
+  // 자동점수 + 수동조정이 100을 넘지 않도록 (단, 음수는 허용)
+  const maxAdj = 100 - autoScore;
+  if (v > maxAdj) { v = maxAdj; input.value = maxAdj; }
+  if (v < -autoScore) { v = -autoScore; input.value = v; }
+
+  document.getElementById("manual-display").textContent = v + " 점";
+  const grand = autoScore + v;
+  document.getElementById("grand-total").textContent = grand + " / 100";
+  document.getElementById("save-total").textContent = grand + " / 100";
+  return v;
+}
+
+async function saveMemoGrading(attemptId, autoScore) {
+  const v = recalcMemo(autoScore);
+  const btn = document.getElementById("btn-save");
+  btn.disabled = true;
+  btn.textContent = "저장 중...";
+  const { error } = await supabase.from("exam_attempts").update({
+    essay_score: v,
+    essay_status: "graded",
+    storyline_score: 0,
+    storyline_status: "graded",  // 1~3번 시험엔 스토리라인 없음 → 0점 graded로 처리
+    graded_at: new Date().toISOString(),
+  }).eq("id", attemptId);
+  btn.disabled = false;
+  btn.textContent = "채점 저장";
+  if (error) {
+    alert("저장 오류: " + error.message);
+    return;
+  }
+  showToast("저장됨");
+}
+
+// ============== 공통 유틸 ==============
+function goBack() {
+  document.getElementById("screen-grade").style.display = "none";
+  document.getElementById("screen-list").style.display = "block";
+  loadList();
+}
+
+function showToast(msg) {
+  const toast = document.getElementById("toast");
+  toast.textContent = msg;
+  toast.classList.add("show");
+  setTimeout(() => toast.classList.remove("show"), 1500);
+}
+
+function formatTime(iso) {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  return `${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getDate()).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
+function escapeHtml(s) {
+  return (s || "").toString().replace(/[&<>"']/g, ch => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+  }[ch]));
+}
+</script>
+</body>
+</html>
