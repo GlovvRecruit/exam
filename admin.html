@@ -193,8 +193,9 @@
   <div id="screen-login">
     <div class="panel login">
       <h1>관리자 로그인</h1>
-      <p style="color: #97a1b8; font-size: 14px;">비밀번호를 입력하세요.</p>
-      <input type="password" id="input-pw" placeholder="어드민 비밀번호" autocomplete="off">
+      <p style="color: #97a1b8; font-size: 14px;">Supabase 어드민 계정으로 로그인하세요.</p>
+      <input type="email" id="input-email" placeholder="이메일" autocomplete="username">
+      <input type="password" id="input-pw" placeholder="비밀번호" autocomplete="current-password">
       <button class="btn" id="btn-login">로그인</button>
       <div id="login-error" style="margin-top: 12px; color: #f17a8a; font-size: 13px; display: none;"></div>
     </div>
@@ -213,7 +214,10 @@
       </div>
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
         <span style="color: #97a1b8; font-size: 13px;" id="list-meta">총 0명</span>
-        <button class="btn ghost" id="btn-refresh">새로고침</button>
+        <div style="display: flex; gap: 8px;">
+          <button class="btn ghost" id="btn-refresh">새로고침</button>
+          <button class="btn ghost" id="btn-logout">로그아웃</button>
+        </div>
       </div>
       <div id="list-container"></div>
     </div>
@@ -275,24 +279,73 @@ async function loadMemorizationData(examType) {
 let allAttempts = [];
 let currentFilter = "all";
 
-// ============== 로그인 ==============
-document.getElementById("btn-login").addEventListener("click", () => {
+// ============== 로그인 / 로그아웃 (Supabase Auth) ==============
+function showLoginScreen() {
+  document.getElementById("screen-login").style.display = "block";
+  document.getElementById("screen-list").style.display = "none";
+  document.getElementById("screen-grade").style.display = "none";
+  document.getElementById("input-email").value = "";
+  document.getElementById("input-pw").value = "";
+  document.getElementById("login-error").style.display = "none";
+}
+
+function showListScreen() {
+  document.getElementById("screen-login").style.display = "none";
+  document.getElementById("screen-list").style.display = "block";
+  document.getElementById("screen-grade").style.display = "none";
+  loadList();
+}
+
+document.getElementById("btn-login").addEventListener("click", async () => {
+  const email = document.getElementById("input-email").value.trim();
   const pw = document.getElementById("input-pw").value;
-  if (pw === ADMIN_PASSWORD) {
-    document.getElementById("screen-login").style.display = "none";
-    document.getElementById("screen-list").style.display = "block";
-    loadList();
-  } else {
-    const err = document.getElementById("login-error");
-    err.textContent = "비밀번호가 틀렸습니다.";
+  const err = document.getElementById("login-error");
+  err.style.display = "none";
+
+  if (!email || !pw) {
+    err.textContent = "이메일과 비밀번호를 모두 입력하세요.";
     err.style.display = "block";
+    return;
   }
+
+  const btn = document.getElementById("btn-login");
+  btn.disabled = true;
+  btn.textContent = "로그인 중...";
+  const { error } = await db.auth.signInWithPassword({ email, password: pw });
+  btn.disabled = false;
+  btn.textContent = "로그인";
+
+  if (error) {
+    err.textContent = "로그인 실패: " + error.message;
+    err.style.display = "block";
+    return;
+  }
+  showListScreen();
+});
+
+document.getElementById("input-email").addEventListener("keydown", e => {
+  if (e.key === "Enter") document.getElementById("input-pw").focus();
 });
 document.getElementById("input-pw").addEventListener("keydown", e => {
   if (e.key === "Enter") document.getElementById("btn-login").click();
 });
 
+document.getElementById("btn-logout").addEventListener("click", async () => {
+  await db.auth.signOut();
+  showLoginScreen();
+});
+
 document.getElementById("btn-refresh").addEventListener("click", loadList);
+
+db.auth.onAuthStateChange((event, session) => {
+  if (event === "SIGNED_OUT" || !session) showLoginScreen();
+});
+
+(async () => {
+  const { data: { session } } = await db.auth.getSession();
+  if (session) showListScreen();
+  else showLoginScreen();
+})();
 
 // 필터 버튼
 document.querySelectorAll(".filter-btn").forEach(btn => {
