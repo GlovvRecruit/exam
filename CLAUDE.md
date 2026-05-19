@@ -9,7 +9,7 @@
 - **스택**: 순수 HTML/CSS/JS (프레임워크 없음) + Supabase (DB) + GitHub Pages (호스팅)
 - **UI 언어**: 한국어
 - **응시자 흐름**: `index.html`(시험 선택) → `exam-*.html`(이름 입력 후 응시) → 자동 제출
-- **채점자 흐름**: `admin.html` → 비번 입력 → 응시자 목록·자동채점 결과 확인 → 수동 가산점 입력
+- **채점자 흐름**: `admin.html` → Supabase Auth 이메일 로그인 → 응시자 목록·자동채점 결과 확인 → 수동 가산점 입력
 - **중복 응시 방지**: `(name, exam_date, exam_type)` UNIQUE 제약. 같은 사람이 다른 시험은 응시 가능.
 
 ## 시험 4종 구성 (각 100점 만점)
@@ -37,9 +37,10 @@ exam-data-sales.js        ← 세일즈 문제 데이터
 exam-data-feedback.js     ← 피드백 문제 데이터
 exam-data-meta-ads.js     ← 메타광고 문제 데이터 (MCQ/SHORT/ESSAY/STORYLINE)
 
-admin.html                ← 채점 어드민 (4종 모두 대응, 시험별 필터)
-config.js                 ← Supabase URL/Key, ADMIN_PASSWORD
-schema.sql                ← Supabase 테이블/RLS 생성 SQL
+admin.html                ← 채점 어드민 (4종 대응, 시험별 필터, Supabase Auth 로그인)
+config.js                 ← Supabase URL / anon key / EXAM_DURATION_MIN (어드민 비번 X)
+schema.sql                ← Supabase 테이블/RLS 생성 SQL (초기 1회)
+rls-admin-auth.sql        ← admin auth용 RLS 정책 — schema.sql 후 수동 적용
 README.md                 ← 셋업 가이드 (응시자 안내용 아님)
 ```
 
@@ -52,7 +53,10 @@ README.md                 ← 셋업 가이드 (응시자 안내용 아님)
 - `mcq_answers`, `short_answers`, `essay_answers` (jsonb) / `storyline_answer` (text)
 - `auto_score` (자동) + `essay_score` + `storyline_score` (수동) = `total_score` (generated 컬럼)
 - `essay_status`, `storyline_status`: `'pending'` → 채점 후 변경
-- RLS: anon이 insert/select 가능, update는 `submitted_at IS NULL`일 때만 (제출 후 잠김)
+- RLS (`rls-admin-auth.sql` 적용 후):
+  - **anon**: INSERT / SELECT 가능. UPDATE는 `submitted_at IS NULL`일 때 + 답안/제출/auto_score/status 컬럼만 (essay_score · storyline_score · essay_grading · storyline_grading · graded_at 은 anon 차단)
+  - **authenticated (어드민)**: 모든 row · 모든 컬럼
+  - ⚠️ 알려진 한계: anon이 `auto_score`는 여전히 쓸 수 있음. exam-*.html이 client-side로 계산해서 제출 시 같이 보내는 구조 때문. 완전 차단하려면 server-side 채점(트리거/Edge Function) 필요. SQL 파일 상단 코멘트 참고
 
 ## 자주 수정하는 부분
 
@@ -72,13 +76,11 @@ const EXAM_DURATION = 90;  // 분 단위, 0이면 시간 제한 없음
   - 매칭 비율 → 점수: 60%↑ 만점 / 50~60% 80% / 40~50% 60% / 30~40% 30% / 30%↓ 0점
 - `points` 필드로 문항 배점 조정 (합계 100 유지)
 
-### 3. 어드민 비번 / Supabase 키
-`config.js` 한 파일에 다 있음:
-```js
-const SUPABASE_URL = "...";
-const SUPABASE_ANON_KEY = "...";
-const ADMIN_PASSWORD = "...";
-```
+### 3. Supabase 키 / 어드민 계정
+- `config.js`에 있는 것: `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `EXAM_DURATION_MIN`. **어드민 비번은 없음** — Supabase Auth로 대체됨.
+- 어드민 계정 추가/삭제/리셋: Supabase Dashboard → **Authentication** → **Users**
+- Email confirm 토글: Authentication → Providers → Email → "Confirm email"
+- 비번 분실 시: 해당 User 삭제 후 재생성 또는 "Send password recovery"
 
 ### 4. 새 시험 종류 추가 시 체크리스트
 1. `exam-data-신규.js` 작성 (`window.examData신규`로 노출)

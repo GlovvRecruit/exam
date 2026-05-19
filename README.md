@@ -40,11 +40,30 @@
 ```js
 const SUPABASE_URL = "https://xxxx.supabase.co";  // 위에서 복사
 const SUPABASE_ANON_KEY = "eyJ...";               // anon public 키
-const ADMIN_PASSWORD = "stack2025";               // 원하는 비번
 const EXAM_DURATION_MIN = 60;                     // 시험 시간(분)
 ```
 
-### 5. GitHub Pages 배포
+### 5. 어드민 계정 생성 (Supabase Auth)
+
+채점자(어드민)는 Supabase Auth 이메일 로그인을 사용합니다.
+
+1. Supabase 대시보드 → **Authentication** → **Users** → **Add user** → **Create new user**
+2. 어드민 이메일과 비밀번호 입력 → **Create user**
+3. **Authentication** → **Providers** → **Email** 설정에서 **Confirm email** 옵션 확인
+   - 켜져 있으면 위에서 입력한 이메일의 confirmation 메일을 클릭해야 로그인 가능
+   - 소수 인원 운영이면 꺼두는 게 편함
+
+### 6. RLS 정책 적용
+
+응시자(anon)와 어드민(authenticated)의 권한을 분리합니다.
+
+1. Supabase 대시보드 → **SQL Editor**
+2. `rls-admin-auth.sql` 파일 전체 복사해서 붙여넣기
+3. **Run** 클릭
+
+> 응시자가 본인 점수(essay_score 등)를 임의로 조작하지 못하게 차단하면서, 어드민은 모든 row를 채점·조회할 수 있게 합니다. 자세한 동작과 알려진 한계는 `rls-admin-auth.sql` 상단 코멘트 참고.
+
+### 7. GitHub Pages 배포
 
 1. 새 GitHub repository 생성 (Public, 이름은 아무거나)
 2. 이 폴더의 파일 전부 업로드
@@ -63,7 +82,7 @@ https://<유저명>.github.io/<repo명>/
 
 ## 채점
 
-`https://<유저명>.github.io/<repo명>/admin.html` 접속해서 비밀번호 입력하면:
+`https://<유저명>.github.io/<repo명>/admin.html` 접속해서 **Supabase 어드민 이메일 + 비밀번호**로 로그인하면:
 
 - 응시자 목록 (시험별 필터링 가능)
 - 메타광고는 객관식·단답형 자동 채점 + 서술형·스토리라인 수동 채점
@@ -83,9 +102,10 @@ exam-data-sales.js      ← 2번 문제 데이터
 exam-data-feedback.js   ← 3번 문제 데이터
 exam-data-meta-ads.js   ← 4번 문제 데이터 (MCQ/SHORT/ESSAY/STORYLINE)
 
-admin.html              ← 채점 어드민 (4종 모두 대응, 시험별 필터)
-config.js               ← API 키와 비밀번호 (응시자가 보면 안 되는 건 아니나 신경 쓰지 마세요)
-schema.sql              ← Supabase DB 테이블 생성 SQL
+admin.html              ← 채점 어드민 (4종 모두 대응, 시험별 필터, Supabase Auth 로그인)
+config.js               ← Supabase URL / anon key / 시험 시간 (어드민 비번은 Supabase Auth로 대체)
+schema.sql              ← Supabase DB 테이블 생성 SQL (초기 1회)
+rls-admin-auth.sql      ← admin auth용 RLS 정책 (admin.html 배포 후 수동 적용)
 ```
 
 ## 자동 채점 방식 (1~3번 시험)
