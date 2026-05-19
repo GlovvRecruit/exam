@@ -1,4 +1,4 @@
-# Glovv 인턴 시험 (v3 - 4종 시험)
+# Glovv Manager 시험 (v3 - 4종 시험)
 
 응시자 10명 내외용 시험 웹앱. **무료 인프라**(Supabase + GitHub Pages)로 돌아갑니다.
 

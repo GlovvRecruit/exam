@@ -4,7 +4,7 @@
 
 ## 프로젝트 개요
 
-**Glovv 인턴 시험 웹앱 (v3)** — 인턴 응시자 10명 내외용 온라인 시험 시스템.
+**Glovv Manager 시험 웹앱 (v3)** — Manager 응시자 10명 내외용 온라인 시험 시스템.
 
 - **스택**: 순수 HTML/CSS/JS (프레임워크 없음) + Supabase (DB) + GitHub Pages (호스팅)
 - **UI 언어**: 한국어
