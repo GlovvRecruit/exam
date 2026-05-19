@@ -1386,9 +1386,9 @@ function gradeEssayAnswer(userAnswer, item) {
     }
   }
   const ratio = passed / groups.length;
-  if (ratio >= 0.9) return item.points;
-  if (ratio >= 0.7) return Math.round(item.points * 0.8 * 10) / 10;
-  if (ratio >= 0.5) return Math.round(item.points * 0.6 * 10) / 10;
+  if (ratio >= 0.6) return item.points;
+  if (ratio >= 0.5) return Math.round(item.points * 0.8 * 10) / 10;
+  if (ratio >= 0.4) return Math.round(item.points * 0.6 * 10) / 10;
   if (ratio >= 0.3) return Math.round(item.points * 0.3 * 10) / 10;
   return 0;
 }

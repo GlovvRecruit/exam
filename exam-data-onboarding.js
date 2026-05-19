@@ -1041,10 +1041,10 @@ function gradeEssayAnswer(userAnswer, item) {
     }
   }
   const ratio = passed / groups.length;
-  // 90%+ 만점 / 70%+ 80% / 50%+ 60% / 30%+ 30% / 그외 0
-  if (ratio >= 0.9) return item.points;
-  if (ratio >= 0.7) return Math.round(item.points * 0.8 * 10) / 10;
-  if (ratio >= 0.5) return Math.round(item.points * 0.6 * 10) / 10;
+  // 60%+ 만점 / 50%+ 80% / 40%+ 60% / 30%+ 30% / 그외 0
+  if (ratio >= 0.6) return item.points;
+  if (ratio >= 0.5) return Math.round(item.points * 0.8 * 10) / 10;
+  if (ratio >= 0.4) return Math.round(item.points * 0.6 * 10) / 10;
   if (ratio >= 0.3) return Math.round(item.points * 0.3 * 10) / 10;
   return 0;
 }
