@@ -23,13 +23,13 @@ create table if not exists exam_attempts (
   essay_answers jsonb default '{}'::jsonb,
   storyline_answer text default '',
 
-  -- 자동 채점 점수
-  auto_score int default 0,
+  -- 자동 채점 점수 (소수점 채점 가능 — 예: 85.5)
+  auto_score numeric(6,2) default 0,
   -- 수동 채점 점수
-  essay_score int default 0,
-  storyline_score int default 0,
+  essay_score numeric(6,2) default 0,
+  storyline_score numeric(6,2) default 0,
   -- 최종 점수
-  total_score int generated always as (auto_score + essay_score + storyline_score) stored,
+  total_score numeric(7,2) generated always as (auto_score + essay_score + storyline_score) stored,
 
   -- 채점 상태
   essay_status text default 'pending',
@@ -79,3 +79,13 @@ create policy "anyone can select"
 -- alter table exam_attempts drop constraint if exists exam_attempts_name_exam_date_key;
 -- alter table exam_attempts add constraint exam_attempts_name_exam_date_exam_type_key unique (name, exam_date, exam_type);
 -- create index if not exists idx_exam_type on exam_attempts (exam_type);
+
+-- ========================================
+-- 점수 컬럼 int → numeric 마이그레이션 (소수점 점수 허용)
+-- 이미 운영 중이면 Supabase SQL Editor에서 아래 블록 한 번 실행
+-- ========================================
+-- alter table exam_attempts drop column if exists total_score;
+-- alter table exam_attempts alter column auto_score type numeric(6,2) using auto_score::numeric;
+-- alter table exam_attempts alter column essay_score type numeric(6,2) using essay_score::numeric;
+-- alter table exam_attempts alter column storyline_score type numeric(6,2) using storyline_score::numeric;
+-- alter table exam_attempts add column total_score numeric(7,2) generated always as (auto_score + essay_score + storyline_score) stored;

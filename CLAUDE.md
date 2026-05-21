@@ -51,7 +51,7 @@ README.md                 ← 셋업 가이드 (응시자 안내용 아님)
 테이블 1개: `exam_attempts`. 답안은 jsonb 컬럼에 저장.
 
 - `mcq_answers`, `short_answers`, `essay_answers` (jsonb) / `storyline_answer` (text)
-- `auto_score` (자동) + `essay_score` + `storyline_score` (수동) = `total_score` (generated 컬럼)
+- `auto_score` (자동) + `essay_score` + `storyline_score` (수동) = `total_score` (generated 컬럼). 모두 `numeric(6,2)` — 소수점 채점 가능 (예: 85.5). 운영 DB에 v3 초창기 `int`로 만들어진 게 있으면 schema.sql 하단 마이그레이션 블록 참고
 - `essay_status`, `storyline_status`: `'pending'` → 채점 후 변경
 - RLS (`rls-admin-auth.sql` 적용 후):
   - **anon**: INSERT / SELECT 가능. UPDATE는 `submitted_at IS NULL`일 때 + 답안/제출/auto_score/status 컬럼만 (essay_score · storyline_score · essay_grading · storyline_grading · graded_at 은 anon 차단)
