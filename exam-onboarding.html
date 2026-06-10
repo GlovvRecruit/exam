@@ -59,11 +59,11 @@
       <h1>온보딩 - 백지 암기 시험</h1>
       <div class="subtitle">온보딩 표준화 문서 전체를 백지에 직접 작성</div>
       <div class="meta" style="justify-content:center;">
-        <span>총 <b id="total-q">—</b>개 섹션</span><span>만점 <b>100점</b></span>
+        <span>단일 백지 서술</span><span>만점 <b>100점</b></span>
         <span>제한 <b id="exam-duration-display">300분</b></span>
       </div>
       <p style="color:#6b7180; font-size:14px; margin:20px 0;">
-        섹션 제목 외에는 문항 힌트가 없습니다. 표준화 내용을 통문장으로 직접 작성하세요.<br>
+        문항·힌트 없이 빈 칸 하나에 온보딩 표준화 전체 내용을 직접 작성합니다.<br>
         같은 날 같은 이름으로는 이 시험을 한 번만 응시할 수 있습니다.
       </p>
       <input type="text" id="input-name" placeholder="이름" maxlength="20" autocomplete="off"><br>
@@ -78,11 +78,11 @@
         <span><b id="user-name-display"></b>님 응시 중 · 온보딩(백지)</span>
         <span class="timer" id="timer-display"></span>
       </div>
-      <div style="display:flex; justify-content:space-between; margin-top:4px;"><span id="progress-text">0 / 0 섹션 작성</span></div>
+      <div style="display:flex; justify-content:space-between; margin-top:4px;"><span id="progress-text">0자 작성</span></div>
       <div class="bar"><div class="fill" id="progress-fill"></div></div>
     </div>
     <p style="font-size:13px; color:#6b7180; margin:8px 0 14px;">
-      ※ 각 섹션 제목에 해당하는 표준화 내용을 통문장으로 작성하세요. 어느 칸에 적든 전체 내용으로 합산 채점됩니다.<br>
+      ※ 빈 칸 하나에 온보딩 표준화 전체 내용을 통문장으로 작성하세요. 작성 순서는 자유이며, 전체 내용으로 채점됩니다.<br>
       ※ 핵심 키워드가 들어가야 점수가 인정되며, 부분 점수도 가능합니다.
     </p>
     <div id="questions-container"></div>
@@ -224,7 +224,6 @@ function autoGrade(ans){ const norm=normalize(Object.values(ans).join("\n")); le
 const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 let currentAttemptId=null, currentUserName="", answers={}, examEndTime=null, timerInterval=null;
 
-document.getElementById("total-q").textContent = SECTIONS.length;
 document.getElementById("exam-duration-display").textContent = EXAM_DURATION + "분";
 
 document.getElementById("btn-start").addEventListener("click", async () => {
@@ -252,22 +251,17 @@ function escapeHtml(s){return (s||"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&
 
 function renderExam(){
   const c = document.getElementById("questions-container"); c.innerHTML="";
-  SECTIONS.forEach(s=>{
-    const div = document.createElement("div"); div.className="q";
-    div.innerHTML = `<div class="section-divider">${escapeHtml(s.title)}</div>
-      <div class="section-hint">예시 범위: ${escapeHtml(s.hint)}</div>
-      <textarea class="essay-input" data-q="${s.id}" placeholder="이 섹션에 해당하는 표준화 내용을 통문장으로 작성하세요."></textarea>`;
-    c.appendChild(div);
-  });
-  document.querySelectorAll(".essay-input").forEach(el=>{
-    el.addEventListener("input",()=>{ answers[el.dataset.q]=el.value; updateProgress(); saveDraft(); });
-  });
+  const div = document.createElement("div"); div.className="q";
+  div.innerHTML = `<textarea class="essay-input" id="ta-all" style="min-height:560px;" placeholder="온보딩 표준화 전체 내용(참석 확인·오프닝부터 1~3단계, 모델 선정, 포스팅, 일본/미국, 마무리까지)을 통문장으로 작성하세요."></textarea>`;
+  c.appendChild(div);
+  const el = document.getElementById("ta-all");
+  el.addEventListener("input",()=>{ answers.all = el.value; updateProgress(); saveDraft(); });
   updateProgress();
 }
 function updateProgress(){
-  let done=0; SECTIONS.forEach(s=>{ if((answers[s.id]||"").trim().length>5) done++; });
-  document.getElementById("progress-text").textContent = `${done} / ${SECTIONS.length} 섹션 작성`;
-  document.getElementById("progress-fill").style.width = (done/SECTIONS.length*100)+"%";
+  const len = (answers.all||"").trim().length;
+  document.getElementById("progress-text").textContent = `${len.toLocaleString()}자 작성`;
+  document.getElementById("progress-fill").style.width = Math.min(100, len/1500*100)+"%";
 }
 let saveTimer=null;
 function saveDraft(){ if(!currentAttemptId) return; clearTimeout(saveTimer);
