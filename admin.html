@@ -58,6 +58,7 @@
   .badge.exam-sales { background: rgba(182, 90, 46, 0.2); color: #e89870; }
   .badge.exam-feedback { background: rgba(46, 182, 146, 0.2); color: #6fcbb0; }
   .badge.exam-meta-ads { background: rgba(139, 46, 182, 0.2); color: #b070e0; }
+  .badge.exam-flixx { background: rgba(230, 73, 128, 0.2); color: #f080a8; }
   .score-big { font-size: 18px; font-weight: 800; color: #4d9bda; }
   .empty {
     text-align: center; padding: 60px 20px; color: #97a1b8; font-size: 14px;
@@ -211,6 +212,7 @@
         <button class="filter-btn" data-filter="sales">세일즈</button>
         <button class="filter-btn" data-filter="feedback">피드백</button>
         <button class="filter-btn" data-filter="meta-ads">메타광고</button>
+        <button class="filter-btn" data-filter="flixx">플릭스</button>
       </div>
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
         <span style="color: #97a1b8; font-size: 13px;" id="list-meta">총 0명</span>
@@ -242,6 +244,7 @@ const EXAM_TYPES = {
   "sales":      { label: "세일즈", emoji: "🚧", dataFile: "exam-data-sales.js" },
   "feedback":   { label: "피드백", emoji: "📈", dataFile: "exam-data-feedback.js" },
   "meta-ads":   { label: "메타광고", emoji: "📱", dataFile: "exam-data-meta-ads.js" },
+  "flixx":      { label: "플릭스", emoji: "🎬", dataFile: "exam-data-flixx.js" },
 };
 
 // 동적으로 로드한 시험 데이터를 저장
@@ -261,6 +264,7 @@ async function loadMemorizationData(examType) {
         "onboarding": "examDataOnboarding",
         "sales": "examDataSales",
         "feedback": "examDataFeedback",
+        "flixx": "examDataFlixx",
       }[examType];
       const data = window[winKey];
       if (!data) {
