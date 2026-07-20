@@ -454,6 +454,10 @@ async function openGrading(attempt) {
   try {
     if (examType === "meta-ads") {
       renderMetaAdsGrading(attempt);
+    } else if (isBlankAnswers(attempt.essay_answers)) {
+      // 백지(blank) 시험: 응시 페이지가 제출 시 auto_score를 계산·저장하고
+      // essay_answers 에 원문(script / phone / meeting 등)을 넣는다. 문항별이 아니라 원문을 보여준다.
+      renderBlankGrading(attempt, examType);
     } else {
       const data = await loadMemorizationData(examType);
       renderMemorizationGrading(attempt, examType, data);
@@ -705,6 +709,104 @@ async function saveMetaAdsGrading(attemptId, autoScore) {
     return;
   }
   showToast("저장됨");
+}
+
+// ====================================================
+// PART B-0. 백지(blank) 시험 채점 화면 (세일즈·온보딩·플릭스)
+// ====================================================
+// essay_answers 가 문항별(q1..)이 아니라 원문 필드(script/phone/meeting/full 등)로 저장된 경우 true
+function isBlankAnswers(ans) {
+  if (!ans || typeof ans !== "object") return false;
+  const keys = Object.keys(ans);
+  if (keys.includes("__scores")) return true;
+  if (keys.some(k => ["script", "phone", "meeting", "full"].includes(k))) return true;
+  return keys.length > 0 && keys.every(k => !/^q\d+$/.test(k));
+}
+
+function renderBlankGrading(attempt, examType) {
+  const grade = document.getElementById("screen-grade");
+  const examLabel = (EXAM_TYPES[examType] && EXAM_TYPES[examType].label) || examType;
+  const ans = attempt.essay_answers || {};
+  const scores = ans.__scores || {};
+  const LBL = { script: "제출 답안 (백지)", phone: "1부 · 전화 시험 (백지)", meeting: "2부 · 온라인 미팅 (백지)", full: "제출 답안 (백지)" };
+
+  const blocks = Object.keys(ans)
+    .filter(k => k !== "__scores" && typeof ans[k] === "string")
+    .map(k => {
+      const txt = (ans[k] || "").trim();
+      const areaScore = (scores[k] != null)
+        ? ` <span style="color:#97a1b8; font-size:12px; font-weight:400;">· 자동 ${scores[k]}/100</span>` : "";
+      return `
+        <div class="memo-q">
+          <div class="memo-q-title" style="margin-bottom:8px;">
+            ${escapeHtml(LBL[k] || k)}${areaScore}
+            <span style="color:#97a1b8; font-size:12px; font-weight:400;">(${txt.length}자)</span>
+          </div>
+          <div class="memo-q-answer ${txt ? '' : 'empty-answer'}" style="white-space:pre-wrap;">${escapeHtml(txt) || "(미응답)"}</div>
+        </div>`;
+    }).join("");
+
+  const manualAdj = attempt.essay_score || 0;
+
+  grade.innerHTML = `
+    <span class="grading-back" id="btn-back">← 목록으로 돌아가기</span>
+    <div class="panel">
+      <div class="student-header">
+        <div>
+          <div class="student-name">${escapeHtml(attempt.name)}
+            <span class="badge exam-${examType}" style="font-size:12px; vertical-align: middle;">${escapeHtml(examLabel)}</span>
+            <span class="badge" style="background:#3a4055; color:#c4ccdb; font-size:11px; vertical-align: middle;">백지</span>
+          </div>
+          <div class="student-meta">응시일 ${attempt.exam_date} · 제출 ${formatTime(attempt.submitted_at)}</div>
+        </div>
+        <div style="text-align: right;">
+          <div style="font-size: 12px; color: #97a1b8;">자동 채점 (키워드)</div>
+          <div class="score-big">${attempt.auto_score} / 100</div>
+        </div>
+      </div>
+
+      <div class="auto-summary">
+        <div class="summary-card"><div class="label">키워드 자동</div><div class="value">${attempt.auto_score} / 100</div></div>
+        <div class="summary-card"><div class="label">수동 가산/감점</div><div class="value" id="manual-display">${manualAdj} 점</div></div>
+        <div class="summary-card"><div class="label">최종</div><div class="value" id="grand-total" style="color:#7dd8a3;">${attempt.auto_score + manualAdj} / 100</div></div>
+      </div>
+
+      <div class="panel" style="background: rgba(46, 117, 182, 0.1); border-color: #2e75b6; padding: 14px 18px;">
+        <div style="font-size: 14px; font-weight: 700; margin-bottom: 6px;">수동 가산/감점</div>
+        <p style="font-size: 12.5px; color: #c4ccdb; margin: 0 0 10px;">
+          자동 채점은 키워드 매칭 기준입니다. 백지 답안의 흐름·문장 구조·정확성을 보고 가산/감점하세요. (음수 입력 시 감점)
+        </p>
+        <div style="display: flex; gap: 10px; align-items: center;">
+          <label style="color:#97a1b8; font-size:13px;">가산/감점 점수:</label>
+          <input type="number" id="manual-input" step="0.5" value="${manualAdj}"
+                 style="width: 80px; padding: 8px 10px; font-size: 14px; text-align: center;
+                        border-radius: 6px; border: 1px solid #3a4055; background: #1f2330; color: #e6e9f0;">
+          <span style="color:#97a1b8; font-size:12px;">점 (자동 점수에 더해짐)</span>
+        </div>
+      </div>
+
+      <h2 style="font-size:16px; margin: 24px 0 12px;">제출 답안 (백지 원문)</h2>
+      <p style="font-size: 12.5px; color: #97a1b8; margin: 0 0 12px;">
+        응시자가 백지에 직접 작성한 원문입니다. 내용을 보고 위 가산/감점에 반영하세요.
+      </p>
+      ${blocks || '<div class="empty">제출된 답안이 없습니다.</div>'}
+
+      <div class="save-area">
+        <div>
+          <div style="font-size:12px;color:#97a1b8;">최종 점수</div>
+          <div class="total-display" id="save-total">${attempt.auto_score + manualAdj} / 100</div>
+        </div>
+        <button class="btn success" id="btn-save">채점 저장</button>
+      </div>
+    </div>
+  `;
+
+  document.getElementById("btn-back").addEventListener("click", goBack);
+  document.getElementById("manual-input").addEventListener("input", () => recalcMemo(attempt.auto_score));
+  document.getElementById("btn-save").addEventListener("click", () => saveMemoGrading(attempt.id, attempt.auto_score));
+
+  recalcMemo(attempt.auto_score);
+  window.scrollTo(0, 0);
 }
 
 // ====================================================
