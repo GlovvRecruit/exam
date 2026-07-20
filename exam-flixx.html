@@ -358,8 +358,10 @@ function patternHit(n,p){return p.every(t=>n.includes(normalize(t)));}
 function calibrate(raw){ if(raw<=PASS_ANCHOR_RAW) return Math.round(raw*PASS_ANCHOR_SCORE/PASS_ANCHOR_RAW);
   return Math.round(PASS_ANCHOR_SCORE+(raw-PASS_ANCHOR_RAW)*(100-PASS_ANCHOR_SCORE)/(100-PASS_ANCHOR_RAW)); }
 function gradeItems(text, items){ const norm=normalize(text); let total=0,got=0; const miss=[];
-  items.forEach(it=>{ it.parts.forEach(part=>{ total+=part.w;
-    if(part.any.some(p=>patternHit(norm,p))) got+=part.w; else miss.push(it.q+" (+"+part.w+")"); }); });
+  items.forEach(it=>{ let missW=0, itemW=0; it.parts.forEach(part=>{ total+=part.w; itemW+=part.w;
+    if(part.any.some(p=>patternHit(norm,p))) got+=part.w; else missW+=part.w; });
+    // 항목당 한 줄로만 표시 (놓친 배점 합산). 조각마다 중복 출력하지 않음.
+    if(missW>0) miss.push(it.q + (missW>=itemW ? " (미작성 · -"+missW+"점)" : " (일부 누락 · -"+missW+"점)")); });
   const raw=total? Math.round(got/total*100):0; return { score:calibrate(raw), raw, miss }; }
 
 const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
