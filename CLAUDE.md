@@ -34,7 +34,7 @@ exam-sales.html           ← 세일즈 응시 페이지
 exam-feedback.html        ← 피드백 응시 페이지
 exam-meta-ads.html        ← 메타광고 응시 페이지 (객·단·서·스토리)
 
-rubrics.js                ← ★ 백지 시험(온보딩·세일즈) 채점 기준 — 응시 페이지·admin 공유. 답안지 교체 시 여기 수정
+rubrics.js                ← ★ 백지 시험(온보딩·세일즈·플릭스) 채점 기준 — 응시 페이지·admin 공유. 답안지 교체 시 여기 수정
 exam-data-onboarding.js   ← (구) 온보딩 문항형 데이터 — 예전 q1.. 형식 응시 기록 채점 화면용
 exam-data-sales.js        ← (구) 세일즈 문항형 데이터 — 위와 동일
 exam-data-feedback.js     ← 피드백 문제 데이터
@@ -105,7 +105,7 @@ const EXAM_DURATION = 90;  // 분 단위, 0이면 시간 제한 없음
 - 응시 페이지 로직(`exam-*.html`의 인라인 `<script>`)은 4파일이 거의 동일한 구조라 한 곳 고치면 나머지도 함께 봐야 함.
 - README.md는 약간 stale함 (시험 시간 30분으로 적혀있는 부분 등). 코드가 source of truth.
 
-## 백지 시험 답안지 (온보딩·세일즈)
+## 답안지 · 채점 기준 관리
 
 - 채점 기준은 `rubrics.js` 한 곳. 응시 페이지(`exam-onboarding.html`, `exam-sales.html`)와 `admin.html`이 같이 로드한다.
 - 현재 기준 출처 (2026-10-07): 온보딩 ← 「온보딩1. 진행」+「온보딩2. 방어 스크립트」 / 세일즈 전화 ← 「세일즈2. 전화」 / 세일즈 미팅 ← 「세일즈1. 온라인 미팅」
