@@ -170,6 +170,19 @@
   .save-area .total-display {
     font-size: 22px; font-weight: 800; color: #7dd8a3;
   }
+  /* 정답 자료 관리 */
+  .ref-exam { margin-bottom: 18px; }
+  .ref-exam h2 { font-size: 16px; margin: 0 0 10px; display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .ref-slot { background: #1f2330; border: 1px solid #3a4055; border-radius: 8px; padding: 12px 14px; margin-bottom: 8px;
+    display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .ref-slot .t { font-weight: 700; font-size: 14px; }
+  .ref-slot .m { color: #97a1b8; font-size: 12px; margin-top: 2px; }
+  .ref-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+  .btn.sm { padding: 6px 12px; font-size: 12.5px; }
+  .ref-check { font-size: 12.5px; color: #c4ccdb; margin-top: 8px; }
+  .ref-check ul { margin: 6px 0 0; padding-left: 18px; color: #f6c688; }
+  .ref-text { white-space: pre-wrap; max-height: 420px; overflow: auto; font-size: 12.5px; color: #c4ccdb;
+    background: rgba(255,255,255,0.03); border-left: 3px solid #4a5160; border-radius: 4px; padding: 10px; }
   .toast {
     position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
     background: #1f4a31; color: #7dd8a3; padding: 12px 24px; border-radius: 99px;
@@ -217,6 +230,7 @@
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
         <span style="color: #97a1b8; font-size: 13px;" id="list-meta">총 0명</span>
         <div style="display: flex; gap: 8px;">
+          <button class="btn ghost" id="btn-refs">정답 자료 관리</button>
           <button class="btn ghost" id="btn-refresh">새로고침</button>
           <button class="btn ghost" id="btn-logout">로그아웃</button>
         </div>
@@ -228,6 +242,9 @@
   <!-- 채점 화면 -->
   <div id="screen-grade" style="display:none;"></div>
 
+  <!-- 정답 자료 관리 (백지 시험 답안지 원문 교체·다운로드) -->
+  <div id="screen-refs" style="display:none;"></div>
+
 </div>
 
 <div class="toast" id="toast">저장됨</div>
@@ -235,6 +252,8 @@
 <script src="config.js"></script>
 <!-- 메타광고 데이터만 여기서 로드. 나머지 시험은 채점할 때 동적 로드 -->
 <script src="exam-data-meta-ads.js"></script>
+<!-- 백지 시험(온보딩·세일즈) 채점 기준 — 응시 페이지와 공유 -->
+<script src="rubrics.js"></script>
 <script>
 const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
@@ -288,6 +307,7 @@ function showLoginScreen() {
   document.getElementById("screen-login").style.display = "block";
   document.getElementById("screen-list").style.display = "none";
   document.getElementById("screen-grade").style.display = "none";
+  document.getElementById("screen-refs").style.display = "none";
   document.getElementById("input-email").value = "";
   document.getElementById("input-pw").value = "";
   document.getElementById("login-error").style.display = "none";
@@ -297,6 +317,7 @@ function showListScreen() {
   document.getElementById("screen-login").style.display = "none";
   document.getElementById("screen-list").style.display = "block";
   document.getElementById("screen-grade").style.display = "none";
+  document.getElementById("screen-refs").style.display = "none";
   loadList();
 }
 
@@ -340,6 +361,7 @@ document.getElementById("btn-logout").addEventListener("click", async () => {
 });
 
 document.getElementById("btn-refresh").addEventListener("click", loadList);
+document.getElementById("btn-refs").addEventListener("click", openRefs);
 
 db.auth.onAuthStateChange((event, session) => {
   if (event === "SIGNED_OUT" || !session) showLoginScreen();
@@ -728,7 +750,7 @@ function renderBlankGrading(attempt, examType) {
   const examLabel = (EXAM_TYPES[examType] && EXAM_TYPES[examType].label) || examType;
   const ans = attempt.essay_answers || {};
   const scores = ans.__scores || {};
-  const LBL = { script: "제출 답안 (백지)", phone: "1부 · 전화 시험 (백지)", meeting: "2부 · 온라인 미팅 (백지)", full: "제출 답안 (백지)" };
+  const LBL = { script: "제출 답안 (백지)", phone: "1부 · 전화 시험 (백지)", meeting: "2부 · 온라인 미팅 (백지)", full: "제출 답안 (백지)", all: "제출 답안 (백지)" };
 
   const blocks = Object.keys(ans)
     .filter(k => k !== "__scores" && typeof ans[k] === "string")
@@ -791,6 +813,8 @@ function renderBlankGrading(attempt, examType) {
       </p>
       ${blocks || '<div class="empty">제출된 답안이 없습니다.</div>'}
 
+      <div id="blank-extra"></div>
+
       <div class="save-area">
         <div>
           <div style="font-size:12px;color:#97a1b8;">최종 점수</div>
@@ -807,6 +831,54 @@ function renderBlankGrading(attempt, examType) {
 
   recalcMemo(attempt.auto_score);
   window.scrollTo(0, 0);
+  renderBlankExtra(attempt, examType);
+}
+
+// 백지 답안 아래: 현재 채점 기준 대비 놓친 항목 + 정답 자료(원문) 참고
+async function renderBlankExtra(attempt, examType) {
+  const box = document.getElementById("blank-extra");
+  const exam = window.BlankRubrics && BlankRubrics.EXAMS[examType];
+  if (!box || !exam) return;
+  const ans = attempt.essay_answers || {};
+  const missHtml = Object.keys(exam.areas).map(areaKey => {
+    const text = areaKey === "all"
+      ? Object.keys(ans).filter(k => k !== "__scores" && typeof ans[k] === "string").map(k => ans[k]).join("\n")
+      : (ans[areaKey] || "");
+    const g = BlankRubrics.gradeArea(text, examType, areaKey);
+    return `
+      <details class="qbox">
+        <summary><span>${escapeHtml(exam.areas[areaKey].label)} — 놓친 항목 ${g.miss.length}개</span>
+          <span style="color:#97a1b8; font-size:12px;">현재 기준 ${g.score}/100 (원점수 ${g.raw})</span></summary>
+        <div><ul style="margin:0; padding-left:18px; color:#f6c688;">${g.miss.map(p =>
+          `<li>${escapeHtml(p.k)} <span style="color:#97a1b8;">(+${p.w})</span></li>`).join("") || "<li>없음</li>"}</ul></div>
+      </details>`;
+  }).join("");
+
+  let refHtml = "";
+  const { data: refs, error } = await db.from("exam_references").select("*").eq("exam_type", examType).order("slot");
+  if (error) {
+    refHtml = `<p style="font-size:12.5px; color:#97a1b8;">정답 자료를 불러오지 못했습니다 (${escapeHtml(error.message)}). references.sql 적용 여부를 확인하세요.</p>`;
+  } else if (!refs.length) {
+    refHtml = `<p style="font-size:12.5px; color:#97a1b8;">등록된 정답 자료가 없습니다. 목록 화면의 「정답 자료 관리」에서 파일을 올려주세요.</p>`;
+  } else {
+    refHtml = refs.map(r => `
+      <details class="qbox">
+        <summary><span>📄 ${escapeHtml(r.title)} <span style="color:#97a1b8; font-size:12px;">· ${escapeHtml(r.file_name || "")} · ${formatTime(r.updated_at)}</span></span>
+          ${r.storage_path ? `<button class="btn ghost sm" data-ref-dl="${escapeHtml(r.slot)}">원본 다운로드</button>` : ""}</summary>
+        <div><div class="ref-text">${escapeHtml(r.content || "(추출된 텍스트 없음)")}</div></div>
+      </details>`).join("");
+  }
+
+  box.innerHTML = `
+    <h2 style="font-size:16px; margin: 24px 0 8px;">현재 채점 기준 대비 놓친 항목</h2>
+    <p style="font-size: 12.5px; color: #97a1b8; margin: 0 0 10px;">지금 적용된 답안지 기준으로 다시 계산한 결과입니다. 이전 답안지로 응시한 경우 위 자동 점수와 다를 수 있습니다.</p>
+    ${missHtml}
+    <h2 style="font-size:16px; margin: 24px 0 8px;">정답 자료 (원문)</h2>
+    ${refHtml}`;
+  box.querySelectorAll("[data-ref-dl]").forEach(btn => btn.addEventListener("click", e => {
+    e.preventDefault(); e.stopPropagation();
+    downloadRefFile(refs.find(x => x.slot === btn.dataset.refDl));
+  }));
 }
 
 // ====================================================
@@ -948,6 +1020,209 @@ async function saveMemoGrading(attemptId, autoScore) {
     return;
   }
   showToast("저장됨");
+}
+
+// ====================================================
+// PART C. 정답 자료 관리 — 답안지 원문(PDF) 교체 · 다운로드
+// ====================================================
+// 파일을 교체하면: 원본은 Storage(비공개 버킷)에, 추출 텍스트는 exam_references 에 저장.
+// 자동 채점 키워드(rubrics.js)는 코드에 있으므로 파일 교체로 바뀌지 않는다 →
+// 대신 새 원문에서 찾을 수 없는 채점 항목을 바로 표시해 기준 갱신이 필요한지 알려준다.
+const REF_BUCKET = "exam-references";
+const REF_SLOTS = [
+  { slot: "onboarding-1", exam: "onboarding", area: "all",     title: "온보딩1. 진행",         match: /온보딩\s*1/ },
+  { slot: "onboarding-2", exam: "onboarding", area: "all",     title: "온보딩2. 방어 스크립트", match: /온보딩\s*2/ },
+  { slot: "sales-1",      exam: "sales",      area: "meeting", title: "세일즈1. 온라인 미팅",   match: /세일즈\s*1/ },
+  { slot: "sales-2",      exam: "sales",      area: "phone",   title: "세일즈2. 전화",         match: /세일즈\s*2/ },
+];
+let refRows = [];
+
+async function openRefs() {
+  document.getElementById("screen-list").style.display = "none";
+  document.getElementById("screen-grade").style.display = "none";
+  const box = document.getElementById("screen-refs");
+  box.style.display = "block";
+  box.innerHTML = '<div class="panel"><p style="color:#97a1b8;">로딩 중...</p></div>';
+  const { data, error } = await db.from("exam_references").select("*");
+  refRows = error ? [] : data;
+  renderRefs(error);
+  window.scrollTo(0, 0);
+}
+
+function renderRefs(loadError) {
+  const box = document.getElementById("screen-refs");
+  const examHtml = ["onboarding", "sales"].map(examType => {
+    const slots = REF_SLOTS.filter(s => s.exam === examType).map(def => {
+      const r = refRows.find(x => x.slot === def.slot);
+      const meta = r
+        ? `${escapeHtml(r.file_name || "-")} · ${formatTime(r.updated_at)} 교체 · 텍스트 ${(r.content || "").length.toLocaleString()}자`
+        : "아직 등록된 파일이 없습니다";
+      return `
+        <div class="ref-slot">
+          <div><div class="t">${escapeHtml(def.title)}</div><div class="m">${meta}</div></div>
+          <div class="ref-actions">
+            ${r && r.storage_path ? `<button class="btn ghost sm" data-dl-file="${def.slot}">원본 다운로드</button>` : ""}
+            ${r ? `<button class="btn ghost sm" data-dl-text="${def.slot}">텍스트(.txt)</button>` : ""}
+            <label class="btn sm" style="display:inline-block;">파일 교체
+              <input type="file" accept=".pdf,.txt,.md" data-upload="${def.slot}" style="display:none;"></label>
+          </div>
+        </div>`;
+    }).join("");
+    return `
+      <div class="panel ref-exam">
+        <h2><span>${EXAM_TYPES[examType].emoji} ${EXAM_TYPES[examType].label} 답안지</span>
+          <button class="btn ghost sm" data-dl-rubric="${examType}">채점 기준 다운로드 (.csv)</button></h2>
+        ${slots}
+        <div class="ref-check">${coverageHtml(examType)}</div>
+      </div>`;
+  }).join("");
+
+  box.innerHTML = `
+    <span class="grading-back" id="btn-refs-back">← 목록으로 돌아가기</span>
+    <h1>정답 자료 관리</h1>
+    ${loadError ? `<div class="panel" style="border-color:#f17a8a; color:#f6c6cc; font-size:13px;">
+      정답 자료 테이블을 불러오지 못했습니다: ${escapeHtml(loadError.message)}<br>
+      Supabase SQL Editor 에서 <b>references.sql</b> 을 한 번 실행한 뒤 새로고침하세요. (채점 기준 다운로드는 지금도 가능)</div>` : ""}
+    <div class="panel" style="font-size:13px; color:#c4ccdb;">
+      백지 시험(온보딩·세일즈)의 답안지 원문을 교체·다운로드합니다. PDF를 올리면 텍스트를 추출해 채점 화면에서 원문으로 보여줍니다.<br>
+      여러 파일을 파일명(온보딩1·온보딩2·세일즈1·세일즈2)으로 한 번에 올릴 수도 있습니다.
+      <div style="margin-top:10px;"><label class="btn sm" style="display:inline-block;">여러 파일 한 번에 올리기
+        <input type="file" accept=".pdf,.txt,.md" multiple id="ref-bulk" style="display:none;"></label>
+        <span id="ref-status" style="margin-left:10px; color:#97a1b8;"></span></div>
+      <p style="margin:10px 0 0; color:#97a1b8; font-size:12px;">
+        ※ 자동 채점 키워드는 rubrics.js 에 있어 파일 교체만으로 바뀌지 않습니다. 각 시험 아래 「원문에 없는 채점 항목」이 생기면 채점 기준 갱신이 필요하다는 뜻입니다.</p>
+    </div>
+    ${examHtml}`;
+
+  document.getElementById("btn-refs-back").addEventListener("click", showListScreen);
+  box.querySelectorAll("[data-upload]").forEach(inp => inp.addEventListener("change", async () => {
+    const def = REF_SLOTS.find(s => s.slot === inp.dataset.upload);
+    if (inp.files[0]) await uploadRefs([[def, inp.files[0]]]);
+  }));
+  document.getElementById("ref-bulk").addEventListener("change", async e => {
+    const pairs = [], unknown = [];
+    [...e.target.files].forEach(f => {
+      const def = REF_SLOTS.find(s => s.match.test(f.name.normalize("NFC")));
+      if (def) pairs.push([def, f]); else unknown.push(f.name);
+    });
+    if (unknown.length) alert("파일명으로 답안지를 찾지 못해 건너뜀:\n" + unknown.join("\n"));
+    if (pairs.length) await uploadRefs(pairs);
+  });
+  box.querySelectorAll("[data-dl-file]").forEach(b => b.addEventListener("click", () =>
+    downloadRefFile(refRows.find(r => r.slot === b.dataset.dlFile))));
+  box.querySelectorAll("[data-dl-text]").forEach(b => b.addEventListener("click", () => {
+    const r = refRows.find(x => x.slot === b.dataset.dlText);
+    saveBlob(new Blob([r.content || ""], { type: "text/plain;charset=utf-8" }), r.title + ".txt");
+  }));
+  box.querySelectorAll("[data-dl-rubric]").forEach(b => b.addEventListener("click", () => downloadRubricCsv(b.dataset.dlRubric)));
+}
+
+// 원문(등록된 슬롯 텍스트 합본)에서 찾을 수 없는 채점 항목
+function coverageHtml(examType) {
+  const exam = BlankRubrics.EXAMS[examType];
+  return Object.keys(exam.areas).map(areaKey => {
+    const texts = refRows.filter(r => r.exam_type === examType && r.area === areaKey).map(r => r.content || "");
+    const label = exam.areas[areaKey].label;
+    if (!texts.length) return `<div>${escapeHtml(label)}: 원문 미등록 — 비교 불가</div>`;
+    const norm = BlankRubrics.normalize(texts.join("\n"));
+    const points = BlankRubrics.flatten(exam.areas[areaKey].sections);
+    const missing = points.filter(p => !BlankRubrics.pointHit(norm, p));
+    if (!missing.length) return `<div>✅ ${escapeHtml(label)}: 채점 항목 ${points.length}개 모두 원문과 일치</div>`;
+    return `<div>⚠️ ${escapeHtml(label)}: 원문에 없는 채점 항목 ${missing.length}개 (채점 기준 갱신 필요)
+      <ul>${missing.map(p => `<li>${escapeHtml(p.k)}</li>`).join("")}</ul></div>`;
+  }).join("");
+}
+
+async function uploadRefs(pairs) {
+  const status = document.getElementById("ref-status");
+  for (const [def, file] of pairs) {
+    try {
+      status.textContent = `${def.title} — 텍스트 추출 중...`;
+      const isPdf = /\.pdf$/i.test(file.name) || file.type === "application/pdf";
+      const content = redactSecrets(isPdf ? await extractPdfText(file) : await file.text());
+      const ext = isPdf ? "pdf" : (file.name.split(".").pop() || "txt").toLowerCase();
+      const path = `${def.slot}.${ext}`;
+      status.textContent = `${def.title} — 업로드 중...`;
+      const up = await db.storage.from(REF_BUCKET).upload(path, file,
+        { upsert: true, contentType: file.type || (isPdf ? "application/pdf" : "text/plain") });
+      if (up.error) throw up.error;
+      const old = refRows.find(r => r.slot === def.slot);
+      if (old && old.storage_path && old.storage_path !== path) await db.storage.from(REF_BUCKET).remove([old.storage_path]);
+      const { error } = await db.from("exam_references").upsert({
+        slot: def.slot, exam_type: def.exam, area: def.area, title: def.title,
+        file_name: file.name.normalize("NFC"), storage_path: path, content, updated_at: new Date().toISOString(),
+      });
+      if (error) throw error;
+    } catch (e) {
+      alert(`${def.title} 업로드 실패: ${e.message}`);
+    }
+  }
+  status.textContent = "";
+  const { data } = await db.from("exam_references").select("*");
+  refRows = data || refRows;
+  renderRefs();
+  showToast("교체됨");
+}
+
+// 내부 계정 비밀번호가 원문 텍스트에 남지 않도록 가림 (원본 PDF는 비공개 버킷에만 보관)
+function redactSecrets(text) {
+  return text.replace(/\u0000/g, ":").replace(/((?:password|pw)\s*[:：]\s*)\S+/gi, "$1(비공개)");
+}
+
+let pdfjsReady = null;
+function loadPdfJs() {
+  if (!pdfjsReady) pdfjsReady = new Promise((resolve, reject) => {
+    const sc = document.createElement("script");
+    sc.src = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
+    sc.onload = () => {
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+      resolve(window.pdfjsLib);
+    };
+    sc.onerror = () => { pdfjsReady = null; reject(new Error("PDF 라이브러리 로드 실패")); };
+    document.head.appendChild(sc);
+  });
+  return pdfjsReady;
+}
+async function extractPdfText(file) {
+  const pdfjs = await loadPdfJs();
+  const doc = await pdfjs.getDocument({ data: await file.arrayBuffer() }).promise;
+  const pages = [];
+  for (let i = 1; i <= doc.numPages; i++) {
+    const tc = await (await doc.getPage(i)).getTextContent();
+    pages.push(tc.items.map(it => it.str + (it.hasEOL ? "\n" : "")).join(""));
+  }
+  return pages.join("\n\n").replace(/\n{3,}/g, "\n\n").trim();
+}
+
+async function downloadRefFile(r) {
+  if (!r || !r.storage_path) return;
+  const { data, error } = await db.storage.from(REF_BUCKET).download(r.storage_path);
+  if (error) { alert("다운로드 실패: " + error.message); return; }
+  saveBlob(data, r.file_name || r.storage_path);
+}
+
+// 현재 적용 중인 채점 기준(답안지 키워드)을 엑셀에서 바로 열리는 CSV로
+function downloadRubricCsv(examType) {
+  const exam = BlankRubrics.EXAMS[examType];
+  const q = v => `"${String(v).replace(/"/g, '""')}"`;
+  const rows = [["영역", "섹션", "채점 항목", "배점", "인정 키워드 (| = 또는, + = 모두 포함)"]];
+  Object.keys(exam.areas).forEach(areaKey => {
+    BlankRubrics.flatten(exam.areas[areaKey].sections).forEach(p => {
+      rows.push([exam.areas[areaKey].label, p.section, p.k, p.w, p.any.map(pat => pat.join("+")).join(" | ")]);
+    });
+  });
+  rows.push([], [`보정: 원점수 ${exam.anchorRaw} → ${exam.anchorScore}점 (그 이상은 100점까지 선형)`]);
+  const csv = "﻿" + rows.map(r => r.map(q).join(",")).join("\r\n");
+  const today = new Date().toISOString().slice(0, 10);
+  saveBlob(new Blob([csv], { type: "text/csv;charset=utf-8" }), `${EXAM_TYPES[examType].label}_채점기준_${today}.csv`);
+}
+
+function saveBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 // ============== 공통 유틸 ==============

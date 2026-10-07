@@ -34,8 +34,9 @@ exam-sales.html           ← 세일즈 응시 페이지
 exam-feedback.html        ← 피드백 응시 페이지
 exam-meta-ads.html        ← 메타광고 응시 페이지 (객·단·서·스토리)
 
-exam-data-onboarding.js   ← 온보딩 문제·정답·키워드 + autoGradeMemorization()
-exam-data-sales.js        ← 세일즈 문제 데이터
+rubrics.js                ← ★ 백지 시험(온보딩·세일즈) 채점 기준 — 응시 페이지·admin 공유. 답안지 교체 시 여기 수정
+exam-data-onboarding.js   ← (구) 온보딩 문항형 데이터 — 예전 q1.. 형식 응시 기록 채점 화면용
+exam-data-sales.js        ← (구) 세일즈 문항형 데이터 — 위와 동일
 exam-data-feedback.js     ← 피드백 문제 데이터
 exam-data-meta-ads.js     ← 메타광고 문제 데이터 (MCQ/SHORT/ESSAY/STORYLINE)
 
@@ -43,6 +44,7 @@ admin.html                ← 채점 어드민 (4종 대응, 시험별 필터, S
 config.js                 ← Supabase URL / anon key / EXAM_DURATION_MIN (어드민 비번 X)
 schema.sql                ← Supabase 테이블/RLS 생성 SQL (초기 1회)
 rls-admin-auth.sql        ← admin auth용 RLS 정책 — schema.sql 후 수동 적용
+references.sql            ← 정답 자료(답안지 원문) 테이블 + 비공개 Storage 버킷 — admin 「정답 자료 관리」용, 수동 적용
 README.md                 ← 셋업 가이드 (응시자 안내용 아님)
 ```
 
@@ -102,4 +104,12 @@ const EXAM_DURATION = 90;  // 분 단위, 0이면 시간 제한 없음
 
 - 응시 페이지 로직(`exam-*.html`의 인라인 `<script>`)은 4파일이 거의 동일한 구조라 한 곳 고치면 나머지도 함께 봐야 함.
 - README.md는 약간 stale함 (시험 시간 30분으로 적혀있는 부분 등). 코드가 source of truth.
+
+## 백지 시험 답안지 (온보딩·세일즈)
+
+- 채점 기준은 `rubrics.js` 한 곳. 응시 페이지(`exam-onboarding.html`, `exam-sales.html`)와 `admin.html`이 같이 로드한다.
+- 현재 기준 출처 (2026-10-07): 온보딩 ← 「온보딩1. 진행」+「온보딩2. 방어 스크립트」 / 세일즈 전화 ← 「세일즈2. 전화」 / 세일즈 미팅 ← 「세일즈1. 온라인 미팅」
+- admin 「정답 자료 관리」: 슬롯별 PDF 교체(텍스트 추출 → `exam_references`, 원본 → Storage `exam-references`), 원본/텍스트/채점기준 CSV 다운로드, 새 원문에 없는 채점 항목 표시.
+- 파일 교체만으로 자동 채점 키워드는 바뀌지 않는다. 「원문에 없는 채점 항목」이 뜨면 `rubrics.js` 갱신 필요.
+- 원문 PDF에 내부 계정·비밀번호가 있으므로 `rubrics.js`(공개 저장소)에 절대 넣지 말 것.
 - 한국어 UI라 변수명·문자열에 한글 다수 포함. 인코딩 UTF-8 유지.
