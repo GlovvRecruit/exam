@@ -439,6 +439,7 @@ function renderList() {
         <td data-label="상태">${statusBadge}</td>
         <td data-label="자동" class="score-big">${submitted ? a.auto_score : "—"}</td>
         <td data-label="합계" class="score-big">${submitted ? (fullyGraded ? a.total_score : "채점중") : "—"}</td>
+        <td data-label=""><button class="btn ghost sm" style="color:#f17a8a;" data-del-attempt="${a.id}">삭제</button></td>
       </tr>
     `;
   }).join("");
@@ -449,7 +450,7 @@ function renderList() {
       <thead>
         <tr>
           <th>이름</th><th>시험</th><th>응시일</th><th>제출</th><th>상태</th>
-          <th>자동</th><th>합계</th>
+          <th>자동</th><th>합계</th><th></th>
         </tr>
       </thead>
       <tbody>${rows}</tbody>
@@ -463,6 +464,30 @@ function renderList() {
       tr.addEventListener("click", () => openGrading(a));
     }
   });
+
+  document.querySelectorAll("[data-del-attempt]").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();  // 행 클릭(채점 화면 열기) 막기
+      deleteAttempt(btn.dataset.delAttempt);
+    });
+  });
+}
+
+// 잘못 입력한 응시 기록 삭제 — 지우면 같은 이름·날짜·시험으로 다시 응시 가능
+async function deleteAttempt(id) {
+  const a = allAttempts.find(x => x.id === id);
+  if (!a) return;
+  const examLabel = EXAM_TYPES[a.exam_type || "meta-ads"]?.label || a.exam_type;
+  const state = a.submitted_at ? `제출됨, ${a.total_score}점` : "응시 중";
+  if (!confirm(`${a.name} · ${examLabel} · ${a.exam_date} (${state})\n\n이 응시 기록을 삭제할까요? 답안·점수가 모두 지워지고 되돌릴 수 없습니다.`)) return;
+
+  const { data, error } = await db.from("exam_attempts").delete().eq("id", id).select("id");
+  if (error) { alert("삭제 실패: " + error.message); return; }
+  if (!data || data.length === 0) { alert("삭제되지 않았습니다. 관리자 로그인 상태를 확인해 주세요."); return; }
+
+  allAttempts = allAttempts.filter(x => x.id !== id);
+  renderList();
+  showToast("삭제됨");
 }
 
 // ============== 채점 화면 분기 ==============
